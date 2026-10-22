@@ -1,0 +1,717 @@
+% =====================================================================
+\section{Space discretisation and symmetric stabilisation}\label{sec:space}
+Let $\{\mathcal T_h\}$ be a shape-regular family of meshes of $\Omega$. We use triangular elements, or quadrilateral elements with $\mathbb P_r$ replaced by $\mathbb Q_r$. For each element $K$, write $h_K=\diam K$, and set
+\[
+h=\max_{K\in\mathcal T_h}h_K\le1 .
+\]
+The velocity and pressure spaces are
+\[
+\bm V_h=\bigl\{\bm v_h\in[H^1_0(\Omega)]^2:\ \bm v_h|_K\in[\mathbb P_r(K)]^2\ \ \forall K\in\mathcal T_h\bigr\},
+\]
+\[
+Q_h=\bigl\{q_h\in L^2_0(\Omega):\ q_h|_K\in\mathbb P_s(K)\ \ \forall K\in\mathcal T_h\bigr\},
+\]
+Here $r\ge1$, and $Q_h$ may be continuous or discontinuous, depending on the finite element pair. We define the pressure--velocity coupling by
+\[
+b(\bm v,q)=-(\nabla\!\cdot\bm v,q).
+\]
+We assume that $(\bm V_h,Q_h)$ is inf--sup stable in the $H^1$ seminorm: for some $\beta_1>0$ independent of $h$, $\nu$, and $\tau$,
+\begin{equation}\label{eq:infsup}
+\inf_{0\ne q_h\in Q_h}\ \sup_{0\ne\bm v_h\in\bm V_h}\ \frac{b(\bm v_h,q_h)}{\|q_h\|\,\|\nabla\bm v_h\|}\ \ge\ \beta_1 .
+\end{equation}
+
+Following~\cite{AKJ}, we consider four symmetric stabilisations.
+\begin{itemize}
+\item \emph{Local projection (LPS).} Let $D(K)$ be a finite-dimensional local space, let $\pi_K:L^2(K)\to D(K)$ be the $L^2$ projection, and set $\kappa_K=I-\pi_K$. The stabilisation is
+\[
+S_h^{\rm LPS}(\bm w,\bm v)=\sum_{K\in\mathcal T_h}\tau_K\,(\kappa_K\nabla\bm w,\kappa_K\nabla\bm v)_K,\qquad \tau_K\sim h_K .
+\]
+One may replace the full gradient by the streamline derivative $(\bmb_K\cdot\nabla)$, with $\bmb_K$ a piecewise constant approximation of $\bmb$.
+\item \emph{Continuous interior penalty (CIP).} The sum is over interior faces:
+\[
+S_h^{\rm CIP}(\bm w,\bm v)=\gamma_{\rm cip}\sum_{F\in\mathcal F_h^{\rm int}}\int_Fh_F^2\,|\bmb\cdot\bm n_F|\,[\![\bm n_F\!\cdot\!\nabla\bm w]\!]\cdot[\![\bm n_F\!\cdot\!\nabla\bm v]\!]\,ds .
+\]
+\item \emph{Orthogonal subscale (OSS).} Set $\bm e_b=\bmb/\|\bmb\|_{\ell^2}$ and define the weighted $L^2$ projection $\pi_h^k$ by
+\[
+\bigl(h\|\bmb\|_{\ell^2}\,\pi_h^kg,\bm\xi_h\bigr)=\bigl(h\|\bmb\|_{\ell^2}\,g,\bm\xi_h\bigr)\qquad\text{for all projection test functions }\bm\xi_h .
+\]
+The corresponding stabilisation is
+\[
+S_h^{\rm OSS}(\bm w,\bm v)=\tau_{\rm oss}\Bigl(h\|\bmb\|_{\ell^2}\,(I-\pi_h^k)(\bm e_b\!\cdot\!\nabla\bm w),\,(I-\pi_h^k)(\bm e_b\!\cdot\!\nabla\bm v)\Bigr),
+\]
+This form is symmetric and nonnegative.
+\item \emph{Subgrid scale (SGS).} Given a scale-separation projection $\Pi$, define
+\[
+S_h^{\rm SGS}(\bm w,\bm v)=\sum_{K\in\mathcal T_h}\tau_K\int_K\nabla\Pi(\bm w):\nabla\Pi(\bm v)\,dx .
+\]
+\end{itemize}
+
+\begin{assumption}[Fortin-type interpolant]\label{ass:I}
+We assume there is a linear, time-independent operator $\bm I_h:[H^{r+1}\cap H^1_0]^2\to\bm V_h$, bounded on $[H^1_0]^2$, that satisfies the following properties for every admissible $\bm v$:
+\begin{enumerate}[(F1),leftmargin=2.8em]
+\item Fortin property:
+\[
+b(\bm v-\bm I_h\bm v,q_h)=0\qquad\text{for all }q_h\in Q_h ;
+\]
+\item gradient approximation:
+\[
+\|\nabla(\bm v-\bm I_h\bm v)\|\le C_Ih^r\|\bm v\|_{r+1} ;
+\]
+\item $L^2$ approximation:
+\[
+\|\bm v-\bm I_h\bm v\|\le C_Ih^{r+1}\|\bm v\|_{r+1} ;
+\]
+\item pressure approximation, for $q\in H^{s+1}\cap L^2_0$:
+\[
+\inf_{q_h\in Q_h}\|q-q_h\|\le C_Ih^{s+1}\|q\|_{s+1} .
+\]
+\end{enumerate}
+\end{assumption}
+For standard finite element pairs, Fortin's criterion gives (F1) and (F2) from \eqref{eq:infsup}; see \cite{BBF}. Property (F3) is an additional approximation assumption. It holds, for example, for the quasi-local, divergence-preserving interpolant of Girault and Scott \cite{GS03} for the Taylor--Hood family. We will also use
+\[
+\|\bm w\|\le C_F\|\nabla\bm w\|\le C_FC_Ih^r\|\bm u\|_{r+1}
+\]
+This bound is independent of negative powers of $\nu$, but it gives one order less in the lower-order terms; see \cref{rem:hyp}(ii). Since $\bm I_h$ is linear, time independent, and bounded on $H^1$, it commutes with the Caputo derivative:
+\[
+\CD(\bm I_h\bm u)=\bm I_h\CD\bm u .
+\]
+We apply $\bm I_h$ only to the velocity.
+
+\begin{assumption}[Stabilisation]\label{ass:S}
+The stabilisation $S_h$ is a symmetric, positive semidefinite bilinear form on $\bm V_h+[H^{r+1}\cap H^1_0]^2$. With the interpolant $\bm I_h$ from \cref{ass:I}, we assume:
+\begin{enumerate}[(S1),leftmargin=2.8em]
+\item for all $\bm v_h\in\bm V_h$:
+\[
+S_h(\bm v_h,\bm v_h)\le C_Sh\,\|\nabla\bm v_h\|^2 ;
+\]
+\item for all $\bm u\in[H^{r+1}\cap H^1_0]^2$:
+\[
+S_h(\bm u,\bm u)+S_h(\bm I_h\bm u,\bm I_h\bm u)\le C_Sh^{2r+1}\|\bm u\|_{r+1}^2 .
+\]
+\end{enumerate}
+\end{assumption}
+The standard LPS, CIP, OSS, and SGS choices satisfy these assumptions when the associated projections and interpolants have the stated approximation properties.
+\[
+S_h(\bm u,\bm u)\lesssim\sum_K\tau_Kh_K^{2r}|\bm u|_{r+1,K}^2 .
+\]
+For CIP, the jump $[\![\bm n_F\!\cdot\!\nabla\bm u]\!]$ vanishes when $\bm u\in H^2$. A trace estimate applied to $\bm I_h\bm u-\bm u$ then gives (S2). This step uses the local bound $h_K\|\nabla^2(\bm I_h\bm u-\bm u)\|_K\le Ch^r\|\bm u\|_{r+1,\omega_K}$, which holds for quasi-local interpolants such as the one in \cite{GS03}. The OSS and SGS cases follow by similar arguments. The constants depend on $\|\bmb\|_{L^\infty}$, $\gamma_{\rm cip}$, and $\tau_{\rm oss}$.
+
+The semi-discrete problem is to find $(\bm u_h(t),p_h(t))\in\bm V_h\times Q_h$, with initial value $\bm u_h(0)=\bm u_{h,0}$, such that for every $(\bm v_h,q_h)\in\bm V_h\times Q_h$,
+\begin{equation}\label{eq:semi}
+\begin{aligned}
+\bigl(\CD\bm u_h,\bm v_h\bigr)+a_h(\bm u_h,\bm v_h)+b(\bm v_h,p_h)&=(\bm f,\bm v_h),\\
+b(\bm u_h,q_h)&=0 
+\end{aligned}
+\end{equation}
+Here the unstabilized bilinear form is
+\begin{equation}\label{eq:forms}
+a(\bm w,\bm v)=\nu(\nabla\bm w,\nabla\bm v)+\bigl((\bmb\cdot\nabla)\bm w,\bm v\bigr)+\mu(\bm w,\bm v).
+\end{equation}    
+We add the grad-div and convection-stabilisation terms to obtain
+\begin{align*}
+a_h(\bm w,\bm v)&=a(\bm w,\bm v)+\gamma(\nabla\!\cdot\bm w,\nabla\!\cdot\bm v)+S_h(\bm w,\bm v)
+\end{align*}
+We use the energy norm
+\[
+\nrm{\bm v}^2=\nu\|\nabla\bm v\|^2+\mu\|\bm v\|^2+\gamma\|\nabla\!\cdot\bm v\|^2+S_h(\bm v,\bm v).
+\]
+To see that \eqref{eq:semi} is well posed, restrict the problem to the discretely divergence-free subspace $\{\bm v_h\in\bm V_h:\ b(\bm v_h,q_h)=0\ \forall q_h\in Q_h\}$. On this subspace, the velocity solves a finite-dimensional fractional ODE system $M\,\CD\bm U+A\bm U=\bm F$, where the mass matrix $M$ is symmetric positive definite. Its solution is continuous on $[0,T]$ and absolutely continuous when $\bm f\in L^2(0,T;L^2)$; see \cite[Ch.\ 6]{Die10} and \cite{LL18}. The pressure is recovered from the first equation of \eqref{eq:semi} using \eqref{eq:infsup}. In particular, $\bm u_h\in W^{1,1}(0,T;\bm V_h)$, the regularity needed below.
+\begin{lemma}[Coercivity]\label{lem:bounds}
+\begin{enumerate}[(i),leftmargin=2.4em]
+\item For $\bm w,\bm v\in[H^1_0(\Omega)]^2$,
+\[
+((\bmb\cdot\nabla)\bm w,\bm v)=-((\bmb\cdot\nabla)\bm v,\bm w).
+\]
+In particular $((\bmb\cdot\nabla)\bm v,\bm v)=0$ and $a_h(\bm v,\bm v)=\nrm{\bm v}^2$.
+\item Assume $S_h(\bm v_h,\bm v_h)\le C_Sh\|\nabla\bm v_h\|^2$ on $\bm V_h$ and put
+\[
+M_h:=\nu^{1/2}+C_F\mu^{1/2}+\sqrt2\,\gamma^{1/2}+(C_Sh)^{1/2}.
+\]
+Then, for $\bm w\in\bm V_h+[H^{r+1}\cap H^1_0]^2$ (so that $S_h(\bm w,\bm w)$ is defined), $\bm v_h\in\bm V_h$ and $q\in L^2_0(\Omega)$,
+\begin{align}
+|b(\bm v_h,q)|&\le\sqrt2\,\|\nabla\bm v_h\|\,\|q\|, \label{eq:b-bound}\\
+|a_h(\bm w,\bm v_h)|&\le\bigl(M_h\nrm{\bm w}+\|\bmb\|_{L^\infty}\|\bm w\|\bigr)\,\|\nabla\bm v_h\|, \label{eq:ah-bound}\\
+\bigl|a(\bm w,\bm v_h)+\gamma(\nabla\!\cdot\bm w,\nabla\!\cdot\bm v_h)\bigr|&\le\bigl[(\nu+2\gamma+C_F\|\bmb\|_{L^\infty})\|\nabla\bm w\|+C_F\mu\|\bm w\|\bigr]\|\nabla\bm v_h\|. \label{eq:a-bound}
+\end{align}
+
+\end{enumerate}
+\end{lemma}
+\begin{proof}
+(i) By the product rule, $\bmb\cdot\nabla(\bm w\cdot\bm v)=(\bmb\cdot\nabla\bm w)\cdot\bm v+(\bmb\cdot\nabla\bm v)\cdot\bm w$. Integrating and applying the divergence theorem,
+\[
+((\bmb\cdot\nabla)\bm w,\bm v)+((\bmb\cdot\nabla)\bm v,\bm w)=\int_\Omega\bmb\cdot\nabla(\bm w\cdot\bm v)\,dx
+=-\int_\Omega(\nabla\!\cdot\bmb)\,\bm w\cdot\bm v\,dx+\int_{\partial\Omega}(\bmb\cdot\bm n)\,\bm w\cdot\bm v\,ds .
+\]
+The first term on the right vanishes because $\nabla\!\cdot\bmb=0$. The boundary term vanishes because $\bm w=\bm v=0$ on $\partial\Omega$; no condition on $\bmb\cdot\bm n$ is needed. Taking $\bm w=\bm v$ gives $2((\bmb\cdot\nabla)\bm v,\bm v)=0$. Consequently, from the definitions in \eqref{eq:forms},
+\[
+a_h(\bm v,\bm v)=\nu\|\nabla\bm v\|^2+\underbrace{((\bmb\cdot\nabla)\bm v,\bm v)}_{=0}+\mu\|\bm v\|^2+\gamma\|\nabla\!\cdot\bm v\|^2+S_h(\bm v,\bm v)=\nrm{\bm v}^2 .
+\]
+
+(ii) Pointwise, $|\nabla\!\cdot\bm v|^2=(\partial_1v_1+\partial_2v_2)^2\le2\bigl((\partial_1v_1)^2+(\partial_2v_2)^2\bigr)\le2|\nabla\bm v|^2$, hence $\|\nabla\!\cdot\bm v\|\le\sqrt2\|\nabla\bm v\|$ and
+\[
+|b(\bm v_h,q)|=|(\nabla\!\cdot\bm v_h,q)|\le\|\nabla\!\cdot\bm v_h\|\,\|q\|\le\sqrt2\,\|\nabla\bm v_h\|\,\|q\|,
+\]
+which is \eqref{eq:b-bound}. For \eqref{eq:ah-bound} we bound the terms of $a_h(\bm w,\bm v_h)$ one by one, using the definition of $\nrm{\cdot}$ and the Cauchy--Schwarz inequality:
+\[
+\begin{aligned}
+\nu(\nabla\bm w,\nabla\bm v_h)&\le\nu^{1/2}\bigl(\nu^{1/2}\|\nabla\bm w\|\bigr)\|\nabla\bm v_h\|\le\nu^{1/2}\nrm{\bm w}\,\|\nabla\bm v_h\|,\\
+\mu(\bm w,\bm v_h)&\le\mu^{1/2}\bigl(\mu^{1/2}\|\bm w\|\bigr)\|\bm v_h\|\le\mu^{1/2}\nrm{\bm w}\,C_F\|\nabla\bm v_h\|,\\
+\gamma(\nabla\!\cdot\bm w,\nabla\!\cdot\bm v_h)&\le\gamma^{1/2}\bigl(\gamma^{1/2}\|\nabla\!\cdot\bm w\|\bigr)\|\nabla\!\cdot\bm v_h\|\le\sqrt2\,\gamma^{1/2}\nrm{\bm w}\,\|\nabla\bm v_h\|,\\
+S_h(\bm w,\bm v_h)&\le S_h(\bm w,\bm w)^{1/2}S_h(\bm v_h,\bm v_h)^{1/2}\le(C_Sh)^{1/2}\nrm{\bm w}\,\|\nabla\bm v_h\|.
+\end{aligned}
+\]
+For the convection term, we use (i), moving the derivative onto $\bm v_h$:
+\[
+((\bmb\cdot\nabla)\bm w,\bm v_h)=-((\bmb\cdot\nabla)\bm v_h,\bm w)\le\|\bmb\|_{L^\infty}\|\nabla\bm v_h\|\,\|\bm w\|.
+\]
+Adding the five bounds gives
+\[
+|a_h(\bm w,\bm v_h)|\le\Bigl[\nu^{1/2}+C_F\mu^{1/2}+\sqrt2\gamma^{1/2}+(C_Sh)^{1/2}\Bigr]\nrm{\bm w}\,\|\nabla\bm v_h\|+\|\bmb\|_{L^\infty}\|\bm w\|\,\|\nabla\bm v_h\|,
+\]
+which is \eqref{eq:ah-bound}. For \eqref{eq:a-bound} we estimate directly
+\[
+\begin{aligned}
+\nu(\nabla\bm w,\nabla\bm v_h)&\le\nu\|\nabla\bm w\|\,\|\nabla\bm v_h\|,\\
+((\bmb\cdot\nabla)\bm w,\bm v_h)&\le\|\bmb\|_{L^\infty}\|\nabla\bm w\|\,\|\bm v_h\|\le C_F\|\bmb\|_{L^\infty}\|\nabla\bm w\|\,\|\nabla\bm v_h\|,\\
+\mu(\bm w,\bm v_h)&\le\mu\|\bm w\|\,\|\bm v_h\|\le C_F\mu\|\bm w\|\,\|\nabla\bm v_h\|,\\
+\gamma(\nabla\!\cdot\bm w,\nabla\!\cdot\bm v_h)&\le\gamma\|\nabla\!\cdot\bm w\|\,\|\nabla\!\cdot\bm v_h\|\le2\gamma\|\nabla\bm w\|\,\|\nabla\bm v_h\|,
+\end{aligned}
+\]
+and add.
+\end{proof}
+
+% =====================================================================
+% \subsection{Fractional calculus preliminaries}\label{sec:tools}
+For absolutely continuous $y$ and nonnegative, integrable $g$, we will use the following identities and inequalities:
+\begin{equation}\label{eq:rl}
+\begin{aligned}
+&\RL\CD y=y-y(0),\qquad \RL1=\frac{t^\alpha}{\Gamma(\alpha+1)},\qquad \RL g\ge0,\\
+&\RL\RL g\le\frac{t^\alpha\,\Gamma(\alpha)}{\Gamma(2\alpha)}\,\RL g,\qquad(\RL g)^2\le\frac{t^\alpha}{\Gamma(\alpha+1)}\,\RL g^2 .
+\end{aligned}
+\end{equation}
+The fourth relation follows from 
+$$\RL\RL g=\frac1{\Gamma(2\alpha)}\int_0^t(t-s)^{2\alpha-1}g(s)\,ds$$ 
+and $$(t-s)^{2\alpha-1}=(t-s)^\alpha(t-s)^{\alpha-1}\le t^\alpha(t-s)^{\alpha-1}$$
+The fifth inequality is Cauchy--Schwarz with respect to the measure $(t-s)^{\alpha-1}ds/\Gamma(\alpha)$, whose total mass is $\RL1$. For vector-valued $\bm g$, the triangle inequality gives $\|\RL\bm g\|\le\RL\|\bm g\|$; likewise, $\nrm{\RL\bm g}\le\RL\nrm{\bm g}$ for the seminorm $\nrm{\cdot}$. The first three identities are standard; see \cite[Ch.\ 2--3]{Die10}.
+
+\begin{lemma}[Positivity of the Caputo derivative \cite{Ali}]\label{lem:posc}
+If $\bm v:[0,T]\to L^2(\Omega)^2$ is absolutely continuous, then
+\[
+(\CD\bm v,\bm v)\ge\tfrac12\CD\|\bm v\|^2 .
+\]
+\end{lemma}
+
+\begin{lemma}[Fractional Gronwall inequality; see \cite{YGD07,LL18}]\label{lem:gronwall}
+Let $y\ge0$ be absolutely continuous, $g\ge0$ integrable, $c_1>0$, and
+\[
+\CD y\le c_1y+g .
+\]
+Then
+\[
+y(t)\le y(0)\,E_\alpha(c_1t^\alpha)+\Gamma(\alpha)\,E_{\alpha,\alpha}(c_1t^\alpha)\,\RL g(t).
+\]
+Consequently, with
+\[
+d:=\max\bigl\{E_\alpha(T^\alpha),\ \Gamma(\alpha)E_{\alpha,\alpha}(T^\alpha)\bigr\}\ge1
+\]
+and $c_1=1$,
+\[
+y(t)\le d\bigl(y(0)+\RL g(t)\bigr),\qquad
+\RL y(t)\le t^\alpha d\Bigl(\frac{y(0)}{\Gamma(\alpha+1)}+\frac{\Gamma(\alpha)}{\Gamma(2\alpha)}\RL g(t)\Bigr).
+\]
+\end{lemma}
+
+We will use the fractional Gronwall inequality in \cref{sec:full}, where its discrete counterpart is needed. For the semi-discrete analysis, the following simpler estimate suffices. It avoids Mittag--Leffler constants and handles the forcing term $a$ through $\RL a$, rather than $\RL a^2$.
+\begin{lemma}[Energy estimate without Gronwall]\label{lem:sup}
+Let $y\in C([0,T])$, $y\ge0$, with $y^2$ absolutely continuous, let $z,a,g\ge0$ be integrable, and suppose that
+\[
+\CD(y^2)+z\le 2ay+g\qquad\text{a.e.\ in }(0,T).
+\]
+Set $\bar a(t):=\sup_{0<s\le t}\RL a(s)$ and $\bar g(t):=\sup_{0<s\le t}\RL g(s)$, assumed finite. Then, for $t\in(0,T]$,
+\begin{equation}\label{eq:sup}
+\sup_{0\le s\le t}y(s)\le y(0)+2\bar a(t)+\bar g(t)^{1/2},\qquad
+\RL z(t)\le y(0)^2+\bar g(t)+2\bar a(t)\sup_{0\le s\le t}y(s).
+\end{equation}
+\end{lemma}
+\begin{proof}
+Let $Y(t):=\sup_{0\le s\le t}y(s)$. Applying $\RL$ and using $\RL\CD(y^2)=y^2-y(0)^2$ from \eqref{eq:rl} gives
+\[
+y(t)^2+\RL z(t)\le y(0)^2+2\,\RL(ay)(t)+\RL g(t)\le y(0)^2+2Y(t)\,\bar a(t)+\bar g(t),
+\]
+since the kernel of $\RL$ is positive and $y\le Y(t)$ on $[0,t]$. The right-hand side is nondecreasing in $t$, so the same bound holds for $y(s)^2$ for every $s\le t$, and taking the supremum over $s$ yields $Y^2\le y(0)^2+\bar g+2\bar aY$. Solving this quadratic inequality,
+\[
+Y\le\bar a+\sqrt{\bar a^2+y(0)^2+\bar g}\le y(0)+2\bar a+\bar g^{1/2},
+\]
+which is the first claim; the second is the displayed inequality with $y(t)^2\ge0$ dropped.
+\end{proof}
+
+
+
+\subsection{Stability analysis}
+We first estimate the semi-discrete velocity and pressure. Testing with the velocity and using coercivity gives the energy bound; the pressure estimate then follows from the momentum equation and the discrete inf--sup condition.
+
+% =====================================================================
+% \subsection{Stability of the semi-discrete problem}\label{sec:stab}
+\begin{theorem}[Semi-discrete stability]\label{thm:stab}
+Let $(\bm u_h,p_h)$ solve \eqref{eq:semi} with $\bm f\in L^2(0,T;L^2)$. Then, for almost every $t\in(0,T]$,
+\begin{equation}\label{eq:energy}
+\tfrac12\CD\|\bm u_h\|^2+\nrm{\bm u_h}^2\le(\bm f,\bm u_h),
+\end{equation}
+and, if $F(t):=\sup_{0<s\le t}\RL\|\bm f\|(s)<\infty$ (for example, if $\bm f\in L^p(0,T;L^2)$ with $p>1/\alpha$),
+\begin{equation}\label{eq:stab}
+\sup_{0\le s\le t}\|\bm u_h(s)\|\le\|\bm u_{h,0}\|+2F(t),\qquad
+2\,\RL\nrm{\bm u_h}^2(t)\le\|\bm u_{h,0}\|^2+2F(t)\bigl(\|\bm u_{h,0}\|+2F(t)\bigr).
+\end{equation}
+For $\bm f\in L^2(0,T;L^2)$ alone, \cref{lem:gronwall} instead gives the pointwise estimate
+$\|\bm u_h(t)\|^2\le\|\bm u_{h,0}\|^2E_\alpha(t^\alpha)+\Gamma(\alpha)E_{\alpha,\alpha}(t^\alpha)\,\RL\|\bm f\|^2(t)$.
+If $\mu>0$, the Gronwall lemma can be avoided:
+\[
+\|\bm u_h(t)\|^2+\RL\nrm{\bm u_h}^2\le\|\bm u_{h,0}\|^2+\mu^{-1}\RL\|\bm f\|^2 .
+\]
+\end{theorem}
+\begin{proof}
+Test \eqref{eq:semi} with $\bm v_h=\bm u_h$ and $q_h=p_h$. Since the discrete divergence constraint gives $b(\bm u_h,p_h)=0$, the first equation becomes
+\[
+(\CD\bm u_h,\bm u_h)+a_h(\bm u_h,\bm u_h)=(\bm f,\bm u_h).
+\]
+By \cref{lem:posc} and \cref{lem:bounds}(i), $(\CD\bm u_h,\bm u_h)\ge\frac12\CD\|\bm u_h\|^2$ and $a_h(\bm u_h,\bm u_h)=\nrm{\bm u_h}^2$; this is \eqref{eq:energy}.
+
+Multiplying \eqref{eq:energy} by $2$ and applying Cauchy--Schwarz gives
+\[
+\CD\|\bm u_h\|^2+2\nrm{\bm u_h}^2\le2\|\bm f\|\,\|\bm u_h\| ,
+\]
+This is the hypothesis of \cref{lem:sup} with $y=\|\bm u_h\|$, $z=2\nrm{\bm u_h}^2$, $a=\|\bm f\|$, and $g=0$, so \eqref{eq:sup} yields \eqref{eq:stab}. For the pointwise estimate, use $2(\bm f,\bm u_h)\le\|\bm f\|^2+\|\bm u_h\|^2$, discard the nonnegative energy term, and apply \cref{lem:gronwall} with $y=\|\bm u_h\|^2$, $c_1=1$, and $g=\|\bm f\|^2$.
+
+If $\mu>0$, then $\|\bm u_h\|\le\mu^{-1/2}\nrm{\bm u_h}$, so that
+\[
+(\bm f,\bm u_h)\le\|\bm f\|\,\|\bm u_h\|\le\mu^{-1/2}\|\bm f\|\,\nrm{\bm u_h}\le\tfrac12\nrm{\bm u_h}^2+\tfrac1{2\mu}\|\bm f\|^2 .
+\]
+Inserting this into \eqref{eq:energy} and multiplying by $2$ gives $\CD\|\bm u_h\|^2+\nrm{\bm u_h}^2\le\mu^{-1}\|\bm f\|^2$; applying $\RL$ proves the last claim.
+\end{proof}
+\begin{remark}
+Estimate \eqref{eq:stab} contains neither exponential growth in $T$ nor negative powers of $\nu$. The advection field enters only through the skew-symmetry in \cref{lem:bounds}(i). A sharper estimate, $\|\bm u_h(t)\|\le\|\bm u_{h,0}\|+\RL\|\bm f\|(t)$, also holds for $\bm f\in L^1(0,T;L^2)$: the discrete Oseen operator is accretive on the discretely divergence-free subspace, and subordination makes the associated solution operators contractions; see \cite{Baz01}. We do not use this sharper bound below.
+\end{remark}
+
+% ---- pressure stability     ppp
+%\newpage
+
+The velocity energy estimate does not directly control the discrete pressure. We therefore combine the momentum equation with the discrete inf--sup condition to obtain the following bound for $p_h$.
+%
+\begin{theorem}[Pressure stability]
+\label{thm:semidiscrete_pressure_stability}
+Let $(\bm u_h,p_h)$ solve \eqref{eq:semi} with 
+$\bm f \in L^2(0,T;[L^2(\Omega)]^2).$
+Then, for a.e.\ $t\in(0,T]$,
+\[
+\begin{aligned}
+\beta_1\|p_h(t)\|
+\le {}&
+C_F\|\bm f(t)\|
++C_F\|{}^{C}D_{0,t}^{\alpha}\bm u_h(t)\|
+\\
+&\quad
++M_h|||\bm u_h(t)|||_h
++\|\boldsymbol b\|_{L^\infty}\|\bm u_h(t)\|.
+\end{aligned}
+\]
+For every $t\in(0,T]$, the fractionally integrated pressure satisfies the following bound:
+\begin{equation}\label{eq:pstab-int}
+\beta_1\|\RL p_h(t)\|\le C_F\bigl(\|\bm u_h(t)\|+\|\bm u_{h,0}\|\bigr)+C_F\,\RL\|\bm f\|(t)+M_h\,\RL\nrm{\bm u_h}(t)+\|\bmb\|_{L^\infty}\RL\|\bm u_h\|(t),
+\end{equation}
+The terms on the right are controlled by \cref{thm:stab} and \eqref{eq:rl}.
+\end{theorem}
+%
+\begin{proof}
+By the discrete inf--sup condition,
+\[
+\beta_1\|p_h(t)\|
+\le
+\sup_{0\ne \bm v_h\in \bm  V_h}
+\frac{|b(\bm v_h,p_h(t))|}{\|\nabla \bm v_h\|}.
+\]
+From the first equation of the semidiscrete problem,
+\[
+b(\bm v_h,p_h)
+=
+(\bm f,\bm v_h)
+-\bigl({}^{C}D_{0,t}^{\alpha}\bm u_h,\bm v_h\bigr)
+-a_h(\bm u_h,\bm v_h).
+\]
+Therefore,
+\[
+\begin{aligned}
+|b(\bm v_h,p_h)|
+\le {}&
+|(\bm f,\bm v_h)|
++
+\bigl|({}^{C}D_{0,t}^{\alpha}\bm u_h,\bm v_h)\bigr|
++
+|a_h(\bm u_h,\bm v_h)|.
+\end{aligned}
+\]
+By the Friedrichs inequality,
+\[
+|(\bm f,\bm v_h)|
+\le
+C_F\|\bm f\|\,\|\nabla \bm v_h\|,
+\]
+and
+\[
+\bigl|({}^{C}D_{0,t}^{\alpha}\bm u_h,\bm v_h)\bigr|
+\le
+C_F\|{}^{C}D_{0,t}^{\alpha}\bm u_h\|
+\,\|\nabla \bm v_h\|.
+\]
+Furthermore, the continuity estimate for $a_h$ gives
+\[
+|a_h(\bm u_h,\bm v_h)|
+\le
+\left(
+M_h|||\bm u_h|||_h
++
+\|\boldsymbol b\|_{L^\infty}\|\bm u_h\|
+\right)
+\|\nabla \bm v_h\|.
+\]
+Combining these estimates yields
+\[
+\begin{aligned}
+|b(\bm v_h,p_h)|
+\le
+\Bigl(
+&C_F\|\bm f\|
++C_F\|{}^{C}D_{0,t}^{\alpha}\bm u_h\|
+\\
+&+
+M_h|||\bm u_h|||_h
++\|\boldsymbol b\|_{L^\infty}\|\bm u_h\|
+\Bigr)
+\|\nabla \bm v_h\|.
+\end{aligned}
+\]
+Taking the supremum over $0\ne \bm v_h\in \bm V_h$ and applying the discrete inf--sup condition proves the pointwise estimate. To obtain \eqref{eq:pstab-int}, fix $\bm v_h$ and apply $\RL$ to the identity for $b(\bm v_h,p_h)$. By \eqref{eq:rl}, $\RL\CD\bm u_h=\bm u_h-\bm u_{h,0}$. Bound $a_h(\RL\bm u_h,\bm v_h)$ using \eqref{eq:ah-bound}, together with $\nrm{\RL\bm u_h}\le\RL\nrm{\bm u_h}$ and $\|\RL\bm u_h\|\le\RL\|\bm u_h\|$. Since $\RL p_h(t)\in Q_h$, another application of the inf--sup condition gives \eqref{eq:pstab-int}.
+\end{proof}
+The pointwise pressure estimate is conditional because it contains $\|\CD\bm u_h\|$, which is not controlled by the energy bound without introducing a negative power of $\nu$. Indeed, testing \eqref{eq:semi} with $\bm v_h=\CD\bm u_h$ yields a bound for $\RL\|\CD\bm u_h\|^2$ that involves $\nu^{-1}\|\bmb\|_{L^\infty}^2$. In contrast, \eqref{eq:pstab-int} gives a viscosity-robust estimate for the fractionally integrated pressure, analogous to the integer-order estimate in \cite{BF07}.
+
+
+
+
+%=====================================================================
+
+\subsection{Error analysis}
+
+%=====================================================================
+
+% =====================================================================
+Let $(\bm u,p)$ be the exact solution. We assume
+\begin{align}\label{sec:error}
+\bm u\in & W^{1,1}\bigl(0,T;[H^1_0]^2\bigr)\cap L^\infty\bigl(0,T;[H^{r+1}\cap H^1_0]^2\bigr),\qquad
+\CD\bm u\in L^\infty\bigl(0,T;[H^{r+1}\cap H^1_0]^2\bigr),\nonumber \\
+&p\in L^\infty\bigl(0,T;H^{s+1}\cap L^2_0\bigr).
+\end{align}
+These regularity conditions depend on the domain $\Omega$ and on compatibility of the data. In time, they require only $\partial_t\bm u\in L^1$, which allows the typical initial behavior $\partial_t\bm u\sim t^{\alpha-1}$. Since $\bm u=0$ on $\partial\Omega$ for all $t$, we also have $\CD\bm u(t)\in H^1_0$. Set
+\[
+\bm w=\bm u-\bm I_h\bm u,\qquad \bm\zeta=\bm u_h-\bm I_h\bm u,\qquad\text{so that}\qquad \bm u_h-\bm u=\bm\zeta-\bm w ,
+\]
+We also let $q_h(t)\in Q_h$ be the $L^2$ projection of $p(t)$ onto $Q_h$. Then $q_h$ is measurable in time, and $\|p-q_h\|$ is the best approximation error in (F4). Constants below depend only on $C_I$ and $C_S$; $\nu$, $\gamma$, $\mu$, and $\|\bmb\|_{L^\infty}$ enter only through $c_h$ and $M_h$. Define
+\begin{equation}\label{eq:vartheta}
+\begin{aligned}
+\vartheta_h(t)&:=c_h\,h^r\|\bm u(t)\|_{r+1}+\gamma^{-1/2}h^{s+1}\|p(t)\|_{s+1},\\
+c_h&:=\|\bmb\|_{L^\infty}+\nu^{1/2}+\gamma^{1/2}+h^{1/2}+\mu h+\mu^{1/2}h,\\
+\kappa_h(t)&:=h^{r+1}\|\CD\bm u(t)\|_{r+1}.
+\end{aligned}
+\end{equation}
+
+\begin{lemma}[Interpolation quantities]\label{lem:interp}
+Under \cref{ass:S,ass:I}, for a.e.\ $t$ and with constants depending only on $C_I$ and $C_S$:
+\begin{enumerate}[(i),leftmargin=2.4em]
+\item the following bounds hold:
+\[
+\|\CD\bm w\|\le C_I\kappa_h,\qquad \nrm{\bm w}^2\le C\vartheta_h^2,\qquad \|\bm w\|\le C\vartheta_h ;
+\]
+\item the quantity
+\[
+A:=\|\CD\bm w\|+\|\bmb\|_{L^\infty}\|\nabla\bm w\|+\mu\|\bm w\|
+\]
+satisfies $A\le C(\kappa_h+\vartheta_h)$;
+\item the quantity
+\[
+B:=\nu^{1/2}\|\nabla\bm w\|+\gamma^{1/2}\|\nabla\!\cdot\bm w\|+S_h(\bm I_h\bm u,\bm I_h\bm u)^{1/2}+\gamma^{-1/2}\|p-q_h\|
+\]
+satisfies $B\le C\vartheta_h$.
+\end{enumerate}
+\end{lemma}
+\begin{proof}
+Note first that each summand of $c_h$ is bounded by $c_h$, and $c_h^2\ge\nu+\gamma+h+\mu h^2$ since the summands are nonnegative.
+
+(i) Since $\bm I_h$ commutes with the Caputo derivative, $\CD\bm w=(I-\bm I_h)\CD\bm u$. Our regularity assumption ensures $\CD\bm u(t)\in[H^{r+1}\cap H^1_0]^2$, so (F3) gives $\|\CD\bm w\|\le C_Ih^{r+1}\|\CD\bm u\|_{r+1}=C_I\kappa_h$. Again by (F3) and $h\le1$,
+\[
+\|\bm w\|\le C_Ih^{r+1}\|\bm u\|_{r+1}\le C_Ih^{1/2}\,h^r\|\bm u\|_{r+1}\le C_Ic_h\,h^r\|\bm u\|_{r+1}\le C_I\vartheta_h .
+\]
+For the energy norm, we bound the four terms of $\nrm{\bm w}^2$ using (F2), (F3), $\|\nabla\!\cdot\bm w\|\le\sqrt2\|\nabla\bm w\|$ and (S2), together with 
+$$S_h(\bm w,\bm w)\le2S_h(\bm u,\bm u)+2S_h(\bm I_h\bm u,\bm I_h\bm u),$$
+to get
+$$\nrm{\bm w}^2\le C(\nu+\mu h^2+\gamma+h)\,h^{2r}\|\bm u\|_{r+1}^2\le Cc_h^2h^{2r}\|\bm u\|_{r+1}^2\le C\vartheta_h^2.$$
+(ii) The three terms of $A$ are bounded as follows:
+\[
+\begin{aligned}
+\|\CD\bm w\|&\le C_I\kappa_h,\\
+\|\bmb\|_{L^\infty}\|\nabla\bm w\|&\le C_I\|\bmb\|_{L^\infty}h^r\|\bm u\|_{r+1}\le C_Ic_h\,h^r\|\bm u\|_{r+1},\\
+\mu\|\bm w\|&\le C_I\,\mu h\cdot h^r\|\bm u\|_{r+1}\le C_Ic_h\,h^r\|\bm u\|_{r+1}.
+\end{aligned}
+\]
+Hence $A\le C_I\kappa_h+2C_Ic_hh^r\|\bm u\|_{r+1}\le C(\kappa_h+\vartheta_h)$.
+
+(iii) The four terms of $B$ are bounded as follows:
+\[
+\begin{aligned}
+\nu^{1/2}\|\nabla\bm w\|
++ \gamma^{1/2}\|\nabla\!\cdot\bm w\| &\le C_I \left(\nu^{1/2} + \sqrt{2} \gamma^{1/2} \right) h^r\|\bm u\|_{r+1} \\
+S_h(\bm I_h\bm u,\bm I_h\bm u)^{1/2}&\le C_S^{1/2}h^{r+1/2}\|\bm u\|_{r+1}=C_S^{1/2}h^{1/2}\,h^r\|\bm u\|_{r+1},\\
+\gamma^{-1/2}\|p-q_h\|&\le C_I\gamma^{-1/2}h^{s+1}\|p\|_{s+1}.
+\end{aligned}
+\]
+Each of the first three is at most $C\,c_hh^r\|\bm u\|_{r+1}$, and the last is part of $\vartheta_h$; hence $B\le C\vartheta_h$.
+\end{proof}
+
+\begin{theorem}[Velocity error]\label{thm:err}
+Under \cref{ass:S,ass:I} and \eqref{sec:error}, for $0<t\le T$,
+\begin{equation}\label{eq:err-main}
+\begin{aligned}
+&\sup_{0\le s\le t}\|\bm u_h(s)-\bm u(s)\|+\Bigl(\RL\nrm{\bm u_h-\bm u}^2(t)\Bigr)^{1/2}\\
+&\qquad\le C\Bigl[\|\bm u_{h,0}-\bm I_h\bm u_0\|+\sup_{0<s\le t}\RL(\kappa_h+\vartheta_h)(s)+\sup_{0<s\le t}\bigl(\RL\vartheta_h^2(s)\bigr)^{1/2}+\sup_{0\le s\le t}\vartheta_h(s)\Bigr],
+\end{aligned}
+\end{equation}
+where $C$ depends only on $C_I$ and $C_S$; in particular it is independent of $h$, $\nu$, $\gamma$, $\mu$, $\alpha$ and $T$. For $\bm u_{h,0}=\bm I_h\bm u_0$ the first term vanishes; in general
+\[
+\|\bm u_{h,0}-\bm I_h\bm u_0\|\le\|\bm u_{h,0}-\bm u_0\|+\|\bm w(0)\| .
+\]
+\end{theorem}
+\begin{proof}
+The exact solution satisfies, for all $\bm v\in[H^1_0]^2$,
+\[
+(\CD\bm u,\bm v)+a(\bm u,\bm v)+b(\bm v,p)=(\bm f,\bm v).
+\]
+Take $\bm v=\bm v_h\in\bm V_h$ and subtract this from the first equation in \eqref{eq:semi}:
+\[
+\bigl(\CD(\bm u_h-\bm u),\bm v_h\bigr)+a_h(\bm u_h,\bm v_h)-a(\bm u,\bm v_h)+b(\bm v_h,p_h-p)=0 .
+\]
+Insert $\bm u_h-\bm u=\bm\zeta-\bm w$ and $\bm u_h=\bm\zeta+\bm I_h\bm u$:
+\[
+(\CD\bm\zeta,\bm v_h)-(\CD\bm w,\bm v_h)+a_h(\bm\zeta,\bm v_h)+\bigl[a_h(\bm I_h\bm u,\bm v_h)-a(\bm u,\bm v_h)\bigr]+b(\bm v_h,p_h-p)=0 .
+\]
+The fourth term on the left-hand side is computed from the definition of $a_h$ and $\nabla\!\cdot\bm I_h\bm u=\nabla\!\cdot\bm u-\nabla\!\cdot\bm w=-\nabla\!\cdot\bm w$:
+\[
+\begin{aligned}
+a_h(\bm I_h\bm u,\bm v_h)-a(\bm u,\bm v_h)&=a(\bm I_h\bm u,\bm v_h)-a(\bm u,\bm v_h)+\gamma(\nabla\!\cdot\bm I_h\bm u,\nabla\!\cdot\bm v_h)+S_h(\bm I_h\bm u,\bm v_h)\\
+&=-a(\bm w,\bm v_h)-\gamma(\nabla\!\cdot\bm w,\nabla\!\cdot\bm v_h)+S_h(\bm I_h\bm u,\bm v_h).
+\end{aligned}
+\]
+Substituting and rearranging,
+\begin{equation}\label{eq:err}
+\begin{aligned}
+&(\CD\bm\zeta,\bm v_h)+a_h(\bm\zeta,\bm v_h)+b(\bm v_h,p_h-p)\\
+&\qquad=(\CD\bm w,\bm v_h)+a(\bm w,\bm v_h)+\gamma(\nabla\!\cdot\bm w,\nabla\!\cdot\bm v_h)-S_h(\bm I_h\bm u,\bm v_h).
+\end{aligned}
+\end{equation}
+
+By (F1) and $\nabla\!\cdot\bm u=0$ we have $b(\bm I_h\bm u,q_h)=b(\bm u,q_h)-b(\bm w,q_h)=0$ for all $q_h\in Q_h$. Together with $b(\bm u_h,q_h)=0$ this gives
+\[
+b(\bm\zeta,q_h)=b(\bm u_h,q_h)-b(\bm I_h\bm u,q_h)=0\qquad\text{for all }q_h\in Q_h .
+\]
+Since $p_h\in Q_h$, $b(\bm\zeta,p_h)=0$; and since $(\nabla\!\cdot\bm\zeta,q_h)=-b(\bm\zeta,q_h)=0$ for the chosen $q_h$,
+\begin{equation}\label{eq:zeta-pressure}
+b(\bm\zeta,p_h-p)=-b(\bm\zeta,p)=(\nabla\!\cdot\bm\zeta,p)=(\nabla\!\cdot\bm\zeta,p-q_h).
+\end{equation}
+
+Choose $\bm v_h=\bm\zeta$ in \eqref{eq:err}. The positivity result in \cref{lem:posc} gives $(\CD\bm\zeta,\bm\zeta)\ge\frac12\CD\|\bm\zeta\|^2$. This applies because $\bm\zeta\in W^{1,1}(0,T;L^2)$, as follows from the well-posedness discussion after \eqref{eq:semi} and $\bm I_h\bm u\in W^{1,1}(0,T;\bm V_h)$. By \cref{lem:bounds}(i), $a_h(\bm\zeta,\bm\zeta)=\nrm{\bm\zeta}^2$. Therefore,
+\[
+\tfrac12\CD\|\bm\zeta\|^2+\nrm{\bm\zeta}^2\le(\CD\bm w,\bm\zeta)+a(\bm w,\bm\zeta)+\gamma(\nabla\!\cdot\bm w,\nabla\!\cdot\bm\zeta)-S_h(\bm I_h\bm u,\bm\zeta)-(\nabla\!\cdot\bm\zeta,p-q_h).
+\]
+The terms on the right-hand side are bounded by using the Cauchy-Schwarz inequality and the definition of $\nrm{\cdot}$:
+\[
+\begin{aligned}
+(\CD\bm w,\bm\zeta)&\le\|\CD\bm w\|\,\|\bm\zeta\|,\\
+a(\bm w,\bm\zeta) &\le \nu^{1/2}\|\nabla\bm w\|\,\nrm{\bm\zeta} + \|\bmb\|_{L^\infty}\|\nabla\bm w\|\,\|\bm\zeta\|+\mu\|\bm w\|\,\|\bm\zeta\|,\\
+\gamma(\nabla\!\cdot\bm w,\nabla\!\cdot\bm\zeta)+
+S_h(\bm I_h\bm u,\bm\zeta)&\le \gamma^{1/2}\|\nabla\!\cdot\bm w\|\,\nrm{\bm\zeta} + S_h(\bm I_h\bm u,\bm I_h\bm u)^{1/2}\nrm{\bm\zeta},\\
+-(\nabla\!\cdot\bm\zeta,p-q_h)&\le\|\nabla\!\cdot\bm\zeta\|\,\|p-q_h\|\le\gamma^{-1/2}\nrm{\bm\zeta}\,\|p-q_h\| .
+\end{aligned}
+\]
+% The last estimate uses the grad-div part of the norm, $\gamma^{1/2}\|\nabla\!\cdot\bm\zeta\|\le\nrm{\bm\zeta}$. 
+In the convection term, the factor $\|\bm\zeta\|$ is deliberately left to the Gronwall argument. Collecting the terms containing $\|\bm\zeta\|$ and those containing $\nrm{\bm\zeta}$, with $A$ and $B$ as in \cref{lem:interp},
+\begin{equation}\label{eq:AB-bound}
+\tfrac12\CD\|\bm\zeta\|^2+\nrm{\bm\zeta}^2\le A\|\bm\zeta\|+B\nrm{\bm\zeta} .
+\end{equation}
+By Young's inequality, 
+$$A\|\bm\zeta\|\le\frac12A^2+\frac12\|\bm\zeta\|^2\; \text{and}\; B\nrm{\bm\zeta}\le\frac12B^2+\frac12\nrm{\bm\zeta}^2,$$ so
+\[
+\tfrac12\CD\|\bm\zeta\|^2+\tfrac12\nrm{\bm\zeta}^2\le\tfrac12\|\bm\zeta\|^2+\tfrac12\bigl(A^2+B^2\bigr).
+\]
+Multiplying by $2$ and using \cref{lem:interp}(ii), and (iii),
+\begin{equation}\label{eq:G}
+\CD\|\bm\zeta\|^2+\nrm{\bm\zeta}^2\le\|\bm\zeta\|^2+G,\qquad\text{with}\;
+\quad G:=A^2+B^2\le C\bigl(\kappa_h^2+\vartheta_h^2\bigr).
+\end{equation}
+We will reuse \eqref{eq:G} in \cref{sec:full}. For the present estimate, return to \eqref{eq:AB-bound} and apply Young's inequality only to the $B$ term, $B\nrm{\bm\zeta}\le\frac12B^2+\frac12\nrm{\bm\zeta}^2$. This gives
+\[
+\CD\|\bm\zeta\|^2+\nrm{\bm\zeta}^2\le2A\|\bm\zeta\|+B^2 .
+\]
+This is the hypothesis of \cref{lem:sup} with $y=\|\bm\zeta\|$ (continuous, with $\|\bm\zeta\|^2$ absolutely continuous since $\bm\zeta\in W^{1,1}(0,T;L^2)$), $z=\nrm{\bm\zeta}^2$, $a=A$ and $g=B^2$. With $\bar A(t):=\sup_{s\le t}\RL A(s)$ and $\bar B(t):=\sup_{s\le t}\RL B^2(s)$, \eqref{eq:sup} yields
+\begin{equation}\label{eq:zeta-final}
+\sup_{0\le s\le t}\|\bm\zeta(s)\|\le\|\bm\zeta(0)\|+2\bar A(t)+\bar B(t)^{1/2},\qquad
+\bigl(\RL\nrm{\bm\zeta}^2(t)\bigr)^{1/2}\le\|\bm\zeta(0)\|+\bar B(t)^{1/2}+\bigl(2\bar A(t)\sup_{s\le t}\|\bm\zeta(s)\|\bigr)^{1/2},
+\end{equation}
+and the last term is at most $\bar A(t)+\frac12\sup_{s\le t}\|\bm\zeta(s)\|$ by Young's inequality. By \cref{lem:interp}(ii),(iii), $\bar A\le C\sup_{s\le t}\RL(\kappa_h+\vartheta_h)(s)$ and $\bar B\le C\sup_{s\le t}\RL\vartheta_h^2(s)$.
+The decomposition $\bm u_h-\bm u=\bm\zeta-\bm w$, the triangle inequality, and \cref{lem:interp}(i) (including $\RL\nrm{\bm w}^2\le C\RL\vartheta_h^2$) now give \eqref{eq:err-main}.
+\end{proof}
+\begin{proof}[Alternative proof via \cref{lem:gronwall}]
+For comparison with \cref{sec:full} we record the Gronwall route, which yields the same rates with a Mittag-Leffler constant.
+% Dropping $\nrm{\bm\zeta}^2\ge0$ in \eqref{eq:G} gives $\CD\|\bm\zeta\|^2\le\|\bm\zeta\|^2+G$. \eqref{lem:gronwall} with $y=\|\bm\zeta\|^2$, $c_1=1$ yields
+Dropping the nonnegative term $\nrm{\bm\zeta}^2$ from \eqref{eq:G} and applying \cref{lem:gronwall} with $y=\|\bm\zeta\|^2$ and $c_1=1$ gives
+\[
+\|\bm\zeta(t)\|^2\le d\bigl(\|\bm\zeta(0)\|^2+\RL G\bigr),\qquad
+\RL\|\bm\zeta\|^2\le t^\alpha d\Bigl(\frac{\|\bm\zeta(0)\|^2}{\Gamma(\alpha+1)}+\frac{\Gamma(\alpha)}{\Gamma(2\alpha)}\RL G\Bigr).
+\]
+Now apply $\RL$ to \eqref{eq:G} itself and use $\RL\CD y=y-y(0)$:
+\[
+\|\bm\zeta(t)\|^2-\|\bm\zeta(0)\|^2+\RL\nrm{\bm\zeta}^2\le\RL\|\bm\zeta\|^2+\RL G .
+\]
+Inserting the bound for $\RL\|\bm\zeta\|^2$,
+\[
+\|\bm\zeta(t)\|^2+\RL\nrm{\bm\zeta}^2\le\Bigl(1+\frac{T^\alpha d}{\Gamma(\alpha+1)}\Bigr)\|\bm\zeta(0)\|^2+\Bigl(1+\frac{T^\alpha d\,\Gamma(\alpha)}{\Gamma(2\alpha)}\Bigr)\RL G ,
+\]
+and therefore
+\begin{equation}\label{eq:zeta-final-ML}
+\|\bm\zeta(t)\|^2+\RL\nrm{\bm\zeta}^2\le K\bigl(\|\bm\zeta(0)\|^2+\RL G\bigr),\qquad
+K:=1+T^\alpha d\max\Bigl\{\frac1{\Gamma(\alpha+1)},\frac{\Gamma(\alpha)}{\Gamma(2\alpha)}\Bigr\}.
+\end{equation}
+From $\bm u_h-\bm u=\bm\zeta-\bm w$ and $(a+b)^2\le2a^2+2b^2$ (for norms, also for seminorms),
+\begin{equation}\label{eq:split}
+\|\bm u_h-\bm u\|^2+\RL\nrm{\bm u_h-\bm u}^2\le2\Bigl(\|\bm\zeta\|^2+\RL\nrm{\bm\zeta}^2\Bigr)+2\Bigl(\|\bm w\|^2+\RL\nrm{\bm w}^2\Bigr).
+\end{equation}
+By \eqref{eq:zeta-final-ML}, the first bracket in \eqref{eq:split} is bounded by $K(\|\bm\zeta(0)\|^2+\RL G)$, where $\|\bm\zeta(0)\|=\|\bm u_{h,0}-\bm I_h\bm u_0\|$ and $G\le C(\kappa_h^2+\vartheta_h^2)$ by \eqref{eq:G}. The interpolation estimate in \cref{lem:interp}(i) bounds the second bracket by $C(\vartheta_h(t)^2+\RL\vartheta_h^2)$. Consequently,
+\[
+\|\bm u_h(t)-\bm u(t)\|^2+\RL\nrm{\bm u_h-\bm u}^2\le C_{T,\alpha}\Bigl[\|\bm u_{h,0}-\bm I_h\bm u_0\|^2+\vartheta_h(t)^2+\RL\bigl(\vartheta_h^2+\kappa_h^2\bigr)\Bigr],
+\]
+Here $C_{T,\alpha}=C(C_I,C_S)K$; the estimate is pointwise in $t$ and includes the Mittag--Leffler factor $d$.
+\end{proof}
+
+\begin{corollary}\label{cor:rate}
+For $\bm u_{h,0}=\bm I_h\bm u_0$,
+\[
+\begin{aligned}
+&\sup_t\|\bm u_h-\bm u\|+\bigl(\RL\nrm{\bm u_h-\bm u}^2\bigr)^{1/2}\\
+&\qquad\le C_{T,\alpha}\Bigl[c_hh^r\sup_t\|\bm u\|_{r+1}+\gamma^{-1/2}h^{s+1}\sup_t\|p\|_{s+1}+h^{r+1}\sup_t\|\CD\bm u\|_{r+1}\Bigr],
+\end{aligned}
+\]
+The constant is $C_{T,\alpha}=C(C_I,C_S)\bigl(1+T^\alpha/\Gamma(\alpha+1)\bigr)$. For Taylor--Hood ($s=r-1$) and $\gamma=O(1)$, the estimate is $O(h^r)$.
+\end{corollary}
+\begin{proof}
+By \eqref{eq:rl},
+\[
+\RL(\kappa_h+\vartheta_h)(s)\le\frac{T^\alpha}{\Gamma(\alpha+1)}\sup_t(\kappa_h+\vartheta_h),\qquad
+\RL\vartheta_h^2(s)\le\frac{T^\alpha}{\Gamma(\alpha+1)}\sup_t\vartheta_h^2 ,
+\]
+and $(T^\alpha/\Gamma(\alpha+1))^{1/2}\le1+T^\alpha/\Gamma(\alpha+1)$. Substituting these bounds into \eqref{eq:err-main} proves the result.
+\end{proof}
+
+\begin{remark}[On the hypotheses]\label{rem:hyp}
+\begin{enumerate}[(i),leftmargin=2.4em]
+\item \emph{How the assumptions enter.} The Fortin property (F1) gives $b(\bm\zeta,q_h)=0$, while (F2) and (S2) are used in \cref{lem:interp}. The bound (S1) is not needed for \cref{thm:err}; it enters through \cref{lem:bounds}(ii) in the pressure estimates. The analysis uses only $\|\bmb\|_{L^\infty}$ and $\nabla\!\cdot\bmb=0$ from the advection field; the stronger assumption $\bmb\in W^{1,\infty}$ is needed only to bound the constants in (S1)--(S2). If $\nabla\!\cdot\bmb\ne0$, replace $\mu\|\bm v\|^2$ by $\bigl((\mu-\tfrac12\nabla\!\cdot\bmb)\bm v,\bm v\bigr)$ and assume $\mu-\tfrac12\nabla\!\cdot\bmb\ge0$.
+\item \emph{The $L^2$ approximation property (F3) is optional for the rate $h^r$.} It is used only to bound $\|\CD\bm w\|$ and $\mu\|\bm w\|$. Without (F3), use $\|\CD\bm w\|\le C_FC_Ih^r\|\CD\bm u\|_{r+1}$ and $\mu\|\bm w\|\le\mu C_FC_Ih^r\|\bm u\|_{r+1}$ instead. Then \cref{cor:rate} remains valid with $\kappa_h$ replaced by $h^r\|\CD\bm u\|_{r+1}$ and with $\mu h+\mu^{1/2}h$ in $c_h$ replaced by $\mu C_F$. Conversely, if (F3) holds in its natural form $\|\bm v-\bm I_h\bm v\|\le C_Ih^m\|\bm v\|_m$ for $1\le m\le r+1$, it is enough to assume $\CD\bm u\in L^\infty(0,T;H^{r})$ in \eqref{sec:error}.
+\item \emph{Sharpness.} For Taylor--Hood elements, the pressure approximation term $\gamma^{-1/2}h^{s+1}=\gamma^{-1/2}h^r$ limits the rate to $h^r$, regardless of how convection is treated. This agrees with the integer-order result in \cite{dFGJN}. Stabilised Oseen methods can achieve the higher order $h^{r+1/2}$ \cite{BF07}, but doing so here would require an interpolant orthogonal to the fluctuation space of $S_h$. That improvement is useful only when $\nabla\!\cdot\bm V_h\subset Q_h$, so the pressure term vanishes.
+\item \emph{Dimension.} The proof extends directly to three space dimensions; replace $\sqrt2$ by $\sqrt3$ in \cref{lem:bounds}.
+\end{enumerate}
+\end{remark}
+
+\begin{proposition}[Pressure error]\label{prop:pressure}
+For almost every $t$,
+\begin{equation}\label{eq:p-cond}
+\beta_1\|p_h-q_h\|\le C_F\|\CD\bm\zeta\|+M_h\nrm{\bm\zeta}+\|\bmb\|_{L^\infty}\|\bm\zeta\|+\Theta_h,
+\end{equation}
+where
+\[
+\begin{aligned}
+\Theta_h:={}&C_F\|\CD\bm w\|+(\nu+2\gamma+C_F\|\bmb\|_{L^\infty})\|\nabla\bm w\|+C_F\mu\|\bm w\|+(C_Sh)^{1/2}S_h(\bm I_h\bm u,\bm I_h\bm u)^{1/2}\\
+&+\sqrt2\|p-q_h\| .
+\end{aligned}
+\]
+The fractionally integrated pressure also admits an unconditional estimate:
+\begin{equation}\label{eq:p-int}
+\begin{aligned}
+\beta_1\|\RL(p_h-q_h)(t)\|\le{}&C_F\bigl(\|\bm\zeta(t)\|+\|\bm\zeta(0)\|+\|\bm w(t)\|+\|\bm w(0)\|\bigr)\\
+&+M_h\RL\nrm{\bm\zeta}+\|\bmb\|_{L^\infty}\RL\|\bm\zeta\|+\RL\Theta_h',
+\end{aligned}
+\end{equation}
+Set $\Theta_h'=\Theta_h-C_F\|\CD\bm w\|$. The right-hand side of \eqref{eq:p-int} is bounded using \cref{thm:err} and \cref{lem:interp}. In particular, for $\bm u_{h,0}=\bm I_h\bm u_0$ and Taylor--Hood elements, $\beta_1\|\RL(p_h-q_h)(t)\|\le C(1+T^\alpha)h^r$, with $C$ independent of $\nu^{-1}$.
+\end{proposition}
+\begin{proof}
+Since $p_h-q_h\in Q_h$, the inf--sup condition \eqref{eq:infsup} gives
+\[
+\beta_1\|p_h-q_h\|\le\sup_{0\ne\bm v\in\bm V_h}\frac{b(\bm v,p_h-q_h)}{\|\nabla\bm v\|}.
+\]
+By \eqref{eq:err}, for every $\bm v\in\bm V_h$,
+\[
+\begin{aligned}
+b(\bm v,p_h-q_h)&=b(\bm v,p_h-p)+b(\bm v,p-q_h)\\
+&=-(\CD\bm\zeta,\bm v)-a_h(\bm\zeta,\bm v)+(\CD\bm w,\bm v)+a(\bm w,\bm v)\\
+&\quad+\gamma(\nabla\!\cdot\bm w,\nabla\!\cdot\bm v)-S_h(\bm I_h\bm u,\bm v)+b(\bm v,p-q_h).
+\end{aligned}
+\]
+We bound the terms by $\|\nabla\bm v\|$, using $\|\bm v\|\le C_F\|\nabla\bm v\|$ and \cref{lem:bounds}:
+\[
+\begin{aligned}
+|(\CD\bm\zeta,\bm v)|&\le C_F\|\CD\bm\zeta\|\,\|\nabla\bm v\|,\\
+|a_h(\bm\zeta,\bm v)|&\le\bigl(M_h\nrm{\bm\zeta}+\|\bmb\|_{L^\infty}\|\bm\zeta\|\bigr)\|\nabla\bm v\| &&\text{by \eqref{eq:ah-bound}},\\
+|(\CD\bm w,\bm v)|&\le C_F\|\CD\bm w\|\,\|\nabla\bm v\|,\\
+|a(\bm w,\bm v)+\gamma(\nabla\!\cdot\bm w,\nabla\!\cdot\bm v)|&\le\bigl[(\nu+2\gamma+C_F\|\bmb\|_{L^\infty})\|\nabla\bm w\|\\
+&\qquad+C_F\mu\|\bm w\|\bigr]\|\nabla\bm v\| &&\text{by \eqref{eq:a-bound}},\\
+|S_h(\bm I_h\bm u,\bm v)|&\le S_h(\bm I_h\bm u,\bm I_h\bm u)^{1/2}(C_Sh)^{1/2}\|\nabla\bm v\|,\\
+|b(\bm v,p-q_h)|&\le\sqrt2\,\|\nabla\bm v\|\,\|p-q_h\| &&\text{by \eqref{eq:b-bound}}.
+\end{aligned}
+\]
+Adding these bounds and dividing by $\|\nabla\bm v\|$ gives \eqref{eq:p-cond}.
+
+For \eqref{eq:p-int}, fix $\bm v\in\bm V_h$ and apply $\RL$ to the identity above. Since $\bm\zeta$, $\bm w$ are absolutely continuous, $\RL\CD\bm\zeta=\bm\zeta-\bm\zeta(0)$ and $\RL\CD\bm w=\bm w-\bm w(0)$, hence
+\[
+\begin{aligned}
+b\bigl(\bm v,\RL(p_h-q_h)\bigr)={}&-(\bm\zeta(t)-\bm\zeta(0),\bm v)-a_h(\RL\bm\zeta,\bm v)+(\bm w(t)-\bm w(0),\bm v)\\
+&+\RL\Bigl[a(\bm w,\bm v)+\gamma(\nabla\!\cdot\bm w,\nabla\!\cdot\bm v)-S_h(\bm I_h\bm u,\bm v)+b(\bm v,p-q_h)\Bigr].
+\end{aligned}
+\]
+By \eqref{eq:ah-bound} and $\nrm{\RL\bm\zeta}\le\RL\nrm{\bm\zeta}$, $\|\RL\bm\zeta\|\le\RL\|\bm\zeta\|$,
+\[
+|a_h(\RL\bm\zeta,\bm v)|\le\bigl(M_h\RL\nrm{\bm\zeta}+\|\bmb\|_{L^\infty}\RL\|\bm\zeta\|\bigr)\|\nabla\bm v\| .
+\]
+The remaining terms are bounded as before. Since $\RL(p_h-q_h)\in Q_h$, dividing by $\|\nabla\bm v\|$ and taking the supremum gives \eqref{eq:p-int}. Finally, $\sup_{s\le t}\|\bm\zeta(s)\|$ and $\RL\nrm{\bm\zeta}^2$ are bounded in \eqref{eq:zeta-final}, $\RL\|\bm\zeta\|\le(t^\alpha/\Gamma(\alpha+1))\sup_{s\le t}\|\bm\zeta(s)\|$, and $\RL\nrm{\bm\zeta}\le(t^\alpha/\Gamma(\alpha+1))^{1/2}(\RL\nrm{\bm\zeta}^2)^{1/2}$ by \eqref{eq:rl}.
+\end{proof}
+The pointwise estimate \eqref{eq:p-cond} is \emph{conditional}: it involves $\|\CD\bm\zeta\|$, which the energy argument does not control without introducing a negative power of $\nu$; see the discussion after \cref{thm:semidiscrete_pressure_stability}. By contrast, the integrated estimate \eqref{eq:p-int} is viscosity robust. As in the integer-order case \cite{BF07}, it is the time-integrated pressure that can be bounded uniformly in $\nu$.
+
+\begin{remark}\label{rem:variants}
+\begin{enumerate}[(a),leftmargin=2.4em]
+\item \emph{Reaction term.} When $\mu>0$, the reaction term controls the $L^2$ norm and lets us avoid the Gronwall lemma. Indeed, $A\|\bm\zeta\|\le A\mu^{-1/2}\nrm{\bm\zeta}$, so that
+\[
+\tfrac12\CD\|\bm\zeta\|^2+\nrm{\bm\zeta}^2\le(\mu^{-1/2}A+B)\nrm{\bm\zeta}\le\tfrac12\nrm{\bm\zeta}^2+\tfrac12(\mu^{-1/2}A+B)^2,
+\]
+and hence
+\[
+\CD\|\bm\zeta\|^2+\nrm{\bm\zeta}^2\le2\mu^{-1}A^2+2B^2,
+\]
+and, applying $\RL$,
+\[
+\|\bm\zeta(t)\|^2+\RL\nrm{\bm\zeta}^2\le\|\bm\zeta(0)\|^2+2\,\RL\bigl(\mu^{-1}A^2+B^2\bigr).
+\]
+The constants contain $\mu^{-1}$ but never $\nu^{-1}$.
+\item \emph{Grad-div parameter.} The assumption $\gamma>0$ is needed to bound the pressure approximation term $\gamma^{-1/2}\|p-q_h\|$. If $\gamma=0$, we only have
+\[
+-(\nabla\!\cdot\bm\zeta,p-q_h)\le\sqrt2\|\nabla\bm\zeta\|\,\|p-q_h\|\le\sqrt2\,\nu^{-1/2}\nrm{\bm\zeta}\,\|p-q_h\|,
+\]
+so that $\nu^{-1/2}$ multiplies the pressure approximation error, unless $\nabla\!\cdot\bm V_h\subset Q_h$ (then $\nabla\!\cdot\bm\zeta=0$ and the term vanishes). For Taylor--Hood, $\gamma\sim1$ balances $\gamma^{1/2}h^r$ and $\gamma^{-1/2}h^{s+1}$.
+\item \emph{Convection.} In our estimate, convection contributes $\|\bmb\|_{L^\infty}h^r$. Moving the derivative to the error instead gives
+\[
+\nu^{-1/2}\|\bmb\|_{L^\infty}\|\bm w\|\,\nrm{\bm\zeta}\lesssim\nu^{-1/2}\|\bmb\|_{L^\infty}h^{r+1}\,\nrm{\bm\zeta},
+\]
+which reintroduces $\nu^{-1/2}$ (at higher order); we do not use it.
+\end{enumerate}
+\end{remark}

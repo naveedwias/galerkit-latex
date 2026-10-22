@@ -22,7 +22,7 @@
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\yes}{\checkmark}
 
-\title{The SMUAS method of Knobloch (Numer.\ Algorithms 2023):\\ implementation check, algorithm and reproduction of the numerical results}
+\title{The SMUAS method of Knobloch (Numer.\ Algorithms 2023):\\ implementation, algorithm, and numerical reproduction}
 \author{galerkit}
 \date{October 2026}
 
@@ -30,13 +30,13 @@
 \maketitle
 
 \begin{abstract}
-P.~Knobloch, \emph{An algebraically stabilized method for convection--diffusion--reaction problems with optimal
-experimental convergence rates on general meshes}, Numer.\ Algorithms 94 (2023)~\cite{Kn23}, analyses why algebraic
-stabilizations lose accuracy on meshes without local symmetry and proposes the Symmetrized Monotone Upwind-type
-Algebraically Stabilized (SMUAS) method. We check that galerkit implements all four methods of the paper (the AFC
-schemes with the Kuzmin and the BJK limiter, MUAS and SMUAS) together with the limiter variants used in its analysis,
-state the SMUAS method as an algorithm, and recompute the paper's numerical results: Tables~1--9, the statements of
-Sections~5 and~6, and Figures~3, 4, 5, 7, 8, 9, 11 and~13. \input{tables/kn23_abstract.tex}
+In \emph{An algebraically stabilized method for convection--diffusion--reaction problems with optimal experimental
+convergence rates on general meshes}, P.~Knobloch studies why algebraic stabilizations can lose accuracy on meshes
+without local symmetry and introduces the Symmetrized Monotone Upwind-type Algebraically Stabilized (SMUAS) method
+\cite{Kn23}. This reproduction checks galerkit's implementations of all four methods considered in the paper—the AFC
+schemes with the Kuzmin and BJK limiters, MUAS, and SMUAS—as well as the limiter variants used in the analysis. It
+also presents SMUAS as an algorithm and recomputes the paper's numerical results: Tables~1--9, the statements in
+Sections~5 and~6, and Figures~3, 4, 5, 7, 8, 9, 11, and~13. \input{tables/kn23_abstract.tex}
 \end{abstract}
 
 \tableofcontents
@@ -48,8 +48,8 @@ Sections~5 and~6, and Figures~3, 4, 5, 7, 8, 9, 11 and~13. \input{tables/kn23_ab
 \begin{table}[!htbp]
 \renewcommand{\thetable}{I}
 \centering\small\setlength{\tabcolsep}{4pt}
-\caption{What~\cite{Kn23} uses and where it is in galerkit (\texttt{src/galerkit/convection\_diffusion}).
-``new'' marks what was added for this reproduction.}\label{tab:kn23-impl}
+\caption{Methods and set-ups used in~\cite{Kn23} and their locations in galerkit
+(\texttt{src/galerkit/convection\_diffusion}). Items marked ``new'' were added for this reproduction.}\label{tab:kn23-impl}
 \begin{tabular}{p{6.2cm}p{8.6cm}}
 \toprule
 item of the paper & galerkit\\
@@ -72,37 +72,39 @@ nonlinear solver ``fixed point rhs'' (Remark 5) & \texttt{afc\_solver="fp\_rhs"}
 \end{tabular}
 \end{table}
 
-\textbf{Answer: yes.} All four methods of the paper were already implemented in galerkit, and Tables~1, 2, 4, 5
-(first row) and~8 had been checked before. The SMUAS implementation (limiter \texttt{"smuas"} in\\ \texttt{src/galerkit/convection\_diffusion/afc.py}) was checked
-line by line against (61)--(68) of~\cite{Kn23}: the sums in $P_i^\pm$ run over $j\in S_i$ with $a_{ij}>0$ or
-$a_{ji}>0$ and those in $Q_i^\pm$ over all $j\in S_i$; the reflected values are $u_{ij}=u_i+\nabla u_h|_{T_{ij}}\cdot
-(x_i-x_j)$ with $T_{ij}$ the simplex of the patch entered by the half line $x_i+t(x_i-x_j)$, $t>0$; $R_i^\pm=1$ at
-Dirichlet nodes and where $P_i^\pm=0$; $\beta_{ij}$ and $b_{ij}$ follow (36), (31), (32). For this reproduction we
-added the limiter variants studied in Section~5 of the paper ($P_i^\pm$ from (25) for the Kuzmin limiter, and the
-factor $\mu_i$ of (27)/(47) in $R_i^\pm$), Examples~2--5, Grids~6--9 and the grid of Table~9.
+\textbf{Answer: yes.} All four methods discussed in the paper were already implemented in galerkit. Tables~1, 2, 4,
+the first row of Table~5, and Table~8 had also been checked previously. We verified the SMUAS implementation
+(limiter \texttt{"smuas"} in\\ \texttt{src/galerkit/convection\_diffusion/afc.py}) line by line against
+(61)--(68) of~\cite{Kn23}. In particular, the sums defining $P_i^\pm$ include only those $j\in S_i$ for which
+$a_{ij}>0$ or $a_{ji}>0$, whereas the sums defining $Q_i^\pm$ include every $j\in S_i$. The reflected values are
+$u_{ij}=u_i+\nabla u_h|_{T_{ij}}\cdot(x_i-x_j)$, where $T_{ij}$ is the simplex in the patch entered by the half-line
+$x_i+t(x_i-x_j)$ for $t>0$. We also confirmed that $R_i^\pm=1$ at Dirichlet nodes and whenever $P_i^\pm=0$, and that
+$\beta_{ij}$ and $b_{ij}$ are defined as in (36), (31), and (32). For this reproduction, we added the limiter
+variants studied in Section~5 ($P_i^\pm$ from (25) for the Kuzmin limiter and the factor $\mu_i$ from (27)/(47) in
+$R_i^\pm$), Examples~2--5, Grids~6--9, and the grid used for Table~9.
 
 %=====================================================================================================
 \section{The SMUAS algorithm}\label{sec:alg}
 %=====================================================================================================
 
-\paragraph{Setting.} $P_1$ elements on a simplicial triangulation of $\Omega\subset\R^d$, nodes $x_1,\dots,x_N$ with
-$x_{M+1},\dots,x_N$ on $\partial\Omega$, $S_i$ the neighbours of $x_i$, $\Delta_i$ the patch of $x_i$, and
-$A=(a_{ij})$ the Galerkin matrix of $-\eps\Delta u+\bb\cdot\nabla u+cu=g$, $a_{ij}=a(\varphi_j,\varphi_i)$. The method
-solves
+\paragraph{Setting.} We use $P_1$ elements on a simplicial triangulation of $\Omega\subset\R^d$. The nodes are
+$x_1,\dots,x_N$, with $x_{M+1},\dots,x_N$ on $\partial\Omega$; $S_i$ denotes the neighbours of $x_i$, and $\Delta_i$
+its patch. Let $A=(a_{ij})$ be the Galerkin matrix for $-\eps\Delta u+\bb\cdot\nabla u+cu=g$, with
+$a_{ij}=a(\varphi_j,\varphi_i)$. The method seeks
 \begin{equation}\label{eq:alg}
   \sum_{j=1}^N\bigl(a_{ij}+b_{ij}(U)\bigr)u_j=g_i,\quad i\le M,\qquad u_i=u_b(x_i),\quad i>M,
 \end{equation}
-with the symmetric, row-sum-free stabilization matrix
+where the symmetric stabilization matrix has zero row sums and is given by
 $b_{ij}(U)=-\max\{\beta_{ij}(U)a_{ij},0,\beta_{ji}(U)a_{ji}\}$ ($i\ne j$), $b_{ii}=-\sum_{j\ne i}b_{ij}$.
 
 \begin{framed}
 \noindent\textbf{Algorithm SMUAS.}\quad\emph{Input:} $A$, $g$, $u_b$, the mesh, the choice (67) or (68) of the weights,
 a tolerance $\tau$. \emph{Output:} $U$ solving \eqref{eq:alg}.
 
-\smallskip\noindent\textbf{Set-up} (once per mesh).
+\smallskip\noindent\textbf{Set-up} (performed once for each mesh).
 \begin{enumerate}[label=S\arabic*., leftmargin=*, itemsep=2pt]
-\item For every interior node $i$ and every $j\in S_i$: find the simplex $T_{ij}\subset\Delta_i$ entered by the half
-  line $\{x_i+t(x_i-x_j):t>0\}$ (the simplex whose barycentric gradients satisfy
+\item For each interior node $i$ and each $j\in S_i$, find the simplex $T_{ij}\subset\Delta_i$ entered by the half
+  line $\{x_i+t(x_i-x_j):t>0\}$. Equivalently, this is the simplex whose barycentric gradients satisfy
   $\nabla\lambda_k\cdot(x_i-x_j)\ge0$ for all its vertices $x_k\ne x_i$). Store the row
   $w_{ij}=e_i+\sum_{x_k\in T_{ij}}(\nabla\lambda_k\cdot(x_i-x_j))\,e_k$, so that the reflected value is
   $u_{ij}=w_{ij}\cdot U=u_i+\nabla u_h|_{T_{ij}}\cdot(x_i-x_j)$ \hfill(60)
@@ -110,7 +112,7 @@ a tolerance $\tau$. \emph{Output:} $U$ solving \eqref{eq:alg}.
   Set $p_{ij}=0$ unless $a_{ij}>0$ or $a_{ji}>0$.
 \end{enumerate}
 
-\noindent\textbf{Stabilization matrix} $B(U)$ for a given $U$.
+\noindent\textbf{Stabilization matrix} $B(U)$ for a given iterate $U$.
 \begin{enumerate}[label=B\arabic*., leftmargin=*, itemsep=2pt]
 \item For $i\le M$ and $j\in S_i$: $\delta_{ij}=u_i-u_j$ and $r_{ij}=u_i-u_{ij}$.
 \item $P_i^\pm=\sum_{j\in S_i}p_{ij}\{(\delta_{ij})^\pm+(r_{ij})^\pm\}$,\quad
@@ -121,24 +123,28 @@ a tolerance $\tau$. \emph{Output:} $U$ solving \eqref{eq:alg}.
 \item $b_{ij}=-\max\{\beta_{ij}a_{ij},0,\beta_{ji}a_{ji}\}$ for every edge, $b_{ii}=-\sum_{j\neq i}b_{ij}$. \hfill(31), (32)
 \end{enumerate}
 
-\noindent\textbf{Nonlinear solve.} Let $D$ be $B$ with all $\beta_{ij}=1$, i.e.\ $d_{ij}=-\max\{a_{ij},0,a_{ji}\}$.
+\noindent\textbf{Nonlinear solve.} Let $D$ denote the matrix obtained from $B$ by setting all $\beta_{ij}=1$;
+thus, $d_{ij}=-\max\{a_{ij},0,a_{ji}\}$.
 \begin{enumerate}[label=N\arabic*., leftmargin=*, itemsep=2pt]
-\item $U^0$: solve $(A+D)U^0=g$ (with the Dirichlet values), the monotone low-order solution.
+\item Find the monotone low-order solution $U^0$ by solving $(A+D)U^0=g$ with the prescribed Dirichlet values.
 \item For $k=0,1,\dots$: compute $B(U^k)$ by B1--B5 and the residual
   $r^k=g-(A+B(U^k))U^k$ on the free nodes; stop if $\|r^k\|_2\le\tau$.
-\item \emph{Fixed point rhs} (used in~\cite{Kn23}, Remark~5): solve $(A+D)\tilde U=g-(B(U^k)-D)U^k$ with the factorization
-  of $A+D$ from N1, and set $U^{k+1}=U^k+\omega_k(\tilde U-U^k)$ with a damping $\omega_k\in(0,1]$; or
+\item \emph{Fixed point rhs} (used in~\cite{Kn23}, Remark~5): solve
+  $(A+D)\tilde U=g-(B(U^k)-D)U^k$ using the factorization of $A+D$ computed in N1, then set
+  $U^{k+1}=U^k+\omega_k(\tilde U-U^k)$ with damping parameter $\omega_k\in(0,1]$; or
   \emph{semismooth Newton}: $U^{k+1}=U^k-\lambda_k J(U^k)^{-1}r^k$ with the generalized Jacobian of the piecewise
   smooth map $U\mapsto(A+B(U))U$ and an Armijo step $\lambda_k$.
 \end{enumerate}
 \end{framed}
 
-\paragraph{Properties} (proved in~\cite{Kn23} for arbitrary simplicial meshes). (A1) and hence existence of a
-solution (Theorem~4), the local DMP via (A2) (Theorem~5), and linearity preservation (Remark~2: for $u_h\in P_1(\R^d)$ one has $r_{ij}=-\delta_{ij}$, hence
+\paragraph{Properties.} For arbitrary simplicial meshes,~\cite{Kn23} proves (A1), and thus the existence of a
+solution (Theorem~4), as well as the local DMP via (A2) (Theorem~5) and linearity preservation (Remark~2). In
+particular, for $u_h\in P_1(\R^d)$, $r_{ij}=-\delta_{ij}$, and therefore
 $P_i^+=-P_i^-=\sum_j p_{ij}|u_i-u_j|\le\sum_j q_{ij}|u_i-u_j|=Q_i^+=-Q_i^-$ by $p_{ij}\le q_{ij}$, so $R_i^\pm=1$ and
 $B(U)=0$).
-The cost per evaluation of $B(U)$ is one sparse product $WU$ (the reflected values) plus edge loops, i.e.\ linear in
-the number of edges; the set-up S1 is a single pass over the patches.
+Each evaluation of $B(U)$ requires one sparse matrix-vector product $WU$ to compute the reflected values, followed
+by loops over the edges. Its cost is therefore linear in the number of edges. The set-up step S1 requires just one
+pass over the patches.
 
 \paragraph{Implementation in galerkit.}
 \begin{itemize}[leftmargin=*, itemsep=1pt]
@@ -153,20 +159,25 @@ the number of edges; the set-up S1 is a single pass over the patches.
 %=====================================================================================================
 
 \begin{itemize}[leftmargin=*]
-\item $P_1$ elements, no lumping of the reaction term (in contrast to~\cite{BJK16}), $\varepsilon$ as stated.
-\item $ne$ is the number of edges on the part of $\partial\Omega$ on $y=1$: Grids 1, 4--8 have $ne\times ne$ squares;
-  Grid~2 has $ne=2$ and Grid~3 $ne=4$ on level~0 and is refined uniformly, so that grids with the same $ne$ have
-  similar numbers of triangles; Grid~9 is built for each $ne$.
-\item Error norm $\|v\|_h^2=\varepsilon|v|_1^2+\sigma_0\|v\|_0^2+b_h(u_h;v,v)$ with $v=u-u_h$, the last term
-  evaluated at $i_hu-u_h$, and $\sigma_0=1$. For Example~2, where $c=0$, the paper's Table~3 is reproduced only with
-  $\sigma_0=1$, i.e.\ the $L^2$ term is kept although $\sigma_0=0$ there: $\sqrt{\varepsilon|e|_1^2+b_h}=8.560\cdot10^{-3}$
-  against the printed $1.179\cdot10^{-2}=\sqrt{(8.560\cdot10^{-3})^2+\|e\|_0^2}$ for $ne=16$.
-\item Nonlinear solver: semismooth Newton with the exact generalized Jacobian (Kuzmin, MUAS, SMUAS) or with coloured
-  finite differences (the variants), stopped at a Euclidean residual of $10^{-10}$; where Newton is slow, the
-  Anderson-accelerated fixed point rhs. The paper used fixed point rhs; the values do not depend on the solver once
-  the residual is small.
-\item ``Odd horizontal grid lines'' in (47), (48) are counted from $y=0$ as line~1, i.e.\ $y=0,2h,4h,\dots$: with
-  $\mu$ on these lines Example~2 is solved exactly, with $\mu$ on the other lines it is not (error $2.5\cdot10^{-2}$).
+\item We use $P_1$ elements and do not lump the reaction term, unlike~\cite{BJK16}. The values of $\varepsilon$ are
+  as specified for each example.
+\item We define $ne$ as the number of edges along the part of $\partial\Omega$ where $y=1$. Grids~1 and~4--8 have
+  $ne\times ne$ squares. Grid~2 starts with $ne=2$ and Grid~3 with $ne=4$ on level~0; both are then uniformly
+  refined, giving grids with the same $ne$ similar numbers of triangles. Grid~9 is generated separately for each
+  value of $ne$.
+\item We compute the error norm
+  $\|v\|_h^2=\varepsilon|v|_1^2+\sigma_0\|v\|_0^2+b_h(u_h;v,v)$ for $v=u-u_h$, evaluating the last term at
+  $i_hu-u_h$, and set $\sigma_0=1$. For Example~2, where $c=0$, Table~3 is reproduced only with $\sigma_0=1$; that
+  is, we retain the $L^2$ term even though the paper sets $\sigma_0=0$. For $ne=16$, omitting it gives
+  $\sqrt{\varepsilon|e|_1^2+b_h}=8.560\cdot10^{-3}$, whereas the printed value is
+  $1.179\cdot10^{-2}=\sqrt{(8.560\cdot10^{-3})^2+\|e\|_0^2}$.
+\item We use semismooth Newton with the exact generalized Jacobian for Kuzmin, MUAS, and SMUAS, and coloured finite
+  differences for the variants. Iterations stop when the Euclidean residual reaches $10^{-10}$. When Newton is
+  slow, we use the Anderson-accelerated fixed point rhs method. Although the paper uses fixed point rhs, the results
+  are solver-independent once the residual is sufficiently small.
+\item We interpret ``odd horizontal grid lines'' in (47) and (48) as lines counted from $y=0$, with the first line
+  indexed by~1; thus, the selected lines are $y=0,2h,4h,\dots$. With $\mu$ on these lines, Example~2 is solved
+  exactly; placing $\mu$ on the other lines gives an error of $2.5\cdot10^{-2}$.
 \end{itemize}
 
 %=====================================================================================================
@@ -186,16 +197,16 @@ the number of edges; the set-up S1 is a single pass over the patches.
 \section{Figures}\label{sec:figs}
 %=====================================================================================================
 
-All figures are wire frames of $u_h$ along the grid lines parallel to the axes, as in the paper; they are
-qualitative and agree with the paper in every feature described there.
+As in the paper, the figures show wire-frame plots of $u_h$ along grid lines parallel to the coordinate axes. They
+are intended as qualitative comparisons and agree with the paper on every feature it describes.
 
 \begin{figure}[!htbp]\centering
 \includegraphics[width=0.75\textwidth]{figures/kn23_fig3.pdf}
 \caption{(Fig.~3 of~\cite{Kn23}) Example~1, $\varepsilon=10^{-8}$, Kuzmin, Grid~4, $ne=32$: $u_h$ and $u_h-i_hu$.}\end{figure}
 \begin{figure}[!htbp]\centering
 \includegraphics[width=\textwidth]{figures/kn23_fig4.pdf}
-\caption{(Fig.~4) $u_h-i_hu$ along $x=0.25$, $ne=32,64,128$. The amplitudes ($\approx0.02$, $0.007$, $0.003$)
-match the vertical scales of the paper's figure.}\end{figure}
+\caption{(Fig.~4) $u_h-i_hu$ along $x=0.25$ for $ne=32,64,128$. The amplitudes ($\approx0.02$, $0.007$, and $0.003$)
+are consistent with the vertical scales in the paper.}\end{figure}
 \begin{figure}[!htbp]\centering
 \includegraphics[width=0.75\textwidth]{figures/kn23_fig5.pdf}
 \caption{(Fig.~5) Kuzmin, Grid~4, $ne=20$: Example~2, and Example~3 with (47), (48).}\end{figure}
@@ -208,8 +219,8 @@ $P_i^\pm$ from (25).}\end{figure}
 \caption{(Fig.~8) Example~4, BJK limiter, Grid~1, $ne=10$, $\mu_i=1$ and $\mu_i=2$.}\end{figure}
 \begin{figure}[!htbp]\centering
 \includegraphics[width=\textwidth]{figures/kn23_fig9.pdf}
-\caption{(Fig.~9) Example~5, Kuzmin, $ne=20$, Grids~1 and~4; the third panel (not in the paper) shows $u_h-u$ on
-Grid~4, where the oscillation is clearer than in the solution itself.}\end{figure}
+\caption{(Fig.~9) Example~5 with the Kuzmin limiter on Grids~1 and~4 for $ne=20$. The third panel, added here,
+shows $u_h-u$ on Grid~4, where the oscillation is easier to see than in the solution itself.}\end{figure}
 \begin{figure}[!htbp]\centering
 \includegraphics[width=0.75\textwidth]{figures/kn23_fig11.pdf}
 \caption{(Fig.~11) Example~1, $\varepsilon=10^{-8}$, SMUAS (68), Grid~4, $ne=32$ and $64$; compare Fig.~3.}\end{figure}
@@ -221,39 +232,42 @@ Grid~4, where the oscillation is clearer than in the solution itself.}\end{figur
 \section{Discussion}\label{sec:disc}
 %=====================================================================================================
 
-\paragraph{Agreement.} Table~S shows the agreement for every recomputed table; together with the checks of
-Section~\ref{sec:checks} and the figures, every numerical statement of~\cite{Kn23} that does not depend on the
-FVCA5 meshes is reproduced (Table~5 up to $ne=256$). Three points of the set-up had to be inferred and are now fixed by the data: the
-$\sigma_0=1$ in $\|\cdot\|_h$ also for $c=0$ (Table~3), the counting of the ``odd horizontal grid lines'' in
-(47), (48), and the use of the (exact, recovered) Grids~2 and~3 of~\cite{BJK16}.
+\paragraph{Agreement.} Table~S summarizes the agreement for each recomputed table. Together with the checks in
+Section~\ref{sec:checks} and the figures, these results reproduce every numerical statement in~\cite{Kn23} that does
+not rely on the FVCA5 meshes; Table~5 is reproduced up to $ne=256$. The data also helped resolve three details of
+the set-up: using $\sigma_0=1$ in $\|\cdot\|_h$ even when $c=0$ (Table~3), how to count the ``odd horizontal grid
+lines'' in (47) and (48), and which versions of Grids~2 and~3 from~\cite{BJK16} to use.
 
-\paragraph{One nuance.} For Example~3 on Grid~4 the paper states that SMUAS is nodally exact except on the last
-interior vertical grid line. This holds for the weights (68). With (67) the computed solution (residual
-$4\cdot10^{-11}$) also has an error of about $10^{-3}$ on the second-last line; the paper does not say which weights it
-used for this statement, and its remark that (67) and (68) give ``similar'' results remains true in the norms.
+\paragraph{A nuance.} For Example~3 on Grid~4, the paper reports that SMUAS is nodally exact everywhere except on
+the last interior vertical grid line. This is true with weights (68). With weights (67), the computed solution
+(residual $4\cdot10^{-11}$) also has an error of about $10^{-3}$ on the second-to-last line. The paper does not
+specify which weights were used for this statement; its conclusion that (67) and (68) give ``similar'' results
+nevertheless remains valid for the norms.
 
-\paragraph{Table 10 not recomputed.} Table~10 uses a triangulated version of the \texttt{mesh4\_1} family of the
-FVCA5 benchmark. The meshes are distributed only by the benchmark web site, which this environment cannot reach,
-and only the coarsest of the six meshes is drawn in the paper (Fig.~12, right); the finer meshes cannot be
-inferred from it. The run script reads any mesh as a \texttt{SimplexMesh}, so Table~10 can be added as soon as the
-files are available.
+\paragraph{Table 10 could not be recomputed.} It uses a triangulated version of the FVCA5 benchmark's
+\texttt{mesh4\_1} family. The meshes are available only from the benchmark website, which could not be reached in
+this environment. The paper shows only the coarsest of the six meshes (Fig.~12, right), so the finer meshes cannot
+be reconstructed from the figure. The run script can read any mesh as a \texttt{SimplexMesh}; Table~10 can therefore
+be added once the mesh files are available.
 
-\paragraph{Solvers.} Semismooth Newton (exact generalized Jacobian for Kuzmin, MUAS and SMUAS) converged in
-7--53 iterations for Tables~1, 4 and 6--9 up to $ne=512$ (up to 40 minutes for the $5.3\cdot10^5$ unknowns of
-Grid~2). For the Kuzmin limiter on Grid~4 (Tables~2 and~3) the Anderson-accelerated fixed point rhs was used at
-$ne=256$ and~$512$ (8\,775 and 550 iterations at $ne=512$), as Newton becomes slow there. Table~5 (SMUAS with (68) on
-Grid~4) is reported up to $ne=256$: at $ne=512$ neither Newton nor the Anderson iteration had converged after
-1.5~hours, and the run was stopped. The paper's Remark~5 (fixed point rhs behaves for SMUAS as for the Kuzmin
-limiter) is therefore confirmed for (67) but not tested at the finest level for (68).
+\paragraph{Solvers.} For Tables~1, 4, and 6--9, semismooth Newton with the exact generalized Jacobian converged in
+7--53 iterations up to $ne=512$ for the Kuzmin limiter, MUAS, and SMUAS. The largest Grid~2 case, with
+$5.3\cdot10^5$ unknowns, took up to 40 minutes. For the Kuzmin limiter on Grid~4 (Tables~2 and~3), we instead used
+the Anderson-accelerated fixed point rhs method at $ne=256$ and $512$, where Newton becomes slow; at $ne=512$, the
+two runs took 8\,775 and 550 iterations. Table~5 (SMUAS with (68) on Grid~4) is reported only up to $ne=256$:
+at $ne=512$, neither Newton nor Anderson had converged after 1.5~hours, so we stopped the run. Thus, the paper's
+Remark~5—that fixed point rhs behaves similarly for SMUAS and the Kuzmin limiter—is confirmed for (67), but was
+not tested at the finest level for (68).
 
-\paragraph{Minimality and the sharper track.} The SMUAS properties used here are exactly those of Table~11 of the
-paper: DMP on arbitrary simplicial meshes (via (A2), which needs only $p_{ij}>0$ for $a_{ij}>0$, (66)), linearity
-preservation (which needs only $p_{ij}\le q_{ij}$, (65)), upwind character (the $\max\{\beta_{ij}a_{ij},0,\beta_{ji}a_{ji}\}$
-form (31)), and the observed optimal rates. The last property is experimental: no a~priori estimate better than
-the $O(h^{1/2})$ of (16) is proved for SMUAS, and the reproduced Tables~4--9 are the evidence. A proof of
-optimal-order convergence on general meshes (the open problem stated at the end of~\cite{Kn23}) would be the
-sharper result; the linearity-preserving BJK limiter~\cite{BJK17} has the DMP and linearity preservation as well but
-not the upwind character, and its nonlinear problems are much harder to solve.
+\paragraph{What is established, and what remains open.} The SMUAS properties discussed here are those listed in
+Table~11 of the paper: the DMP on arbitrary simplicial meshes (from (A2), which requires only $p_{ij}>0$ when
+$a_{ij}>0$, as in (66)); linearity preservation (which requires only $p_{ij}\le q_{ij}$, as in (65)); upwind
+character (the form $\max\{\beta_{ij}a_{ij},0,\beta_{ji}a_{ji}\}$ in (31)); and the experimentally observed optimal
+rates. The rate result remains experimental: for SMUAS, the paper proves no a~priori estimate sharper than the
+$O(h^{1/2})$ bound in (16), so the reproduced Tables~4--9 provide the numerical evidence. A proof of optimal-order
+convergence on general meshes—the open problem identified at the end of~\cite{Kn23}—would be a stronger result.
+The linearity-preserving BJK limiter~\cite{BJK17} also has the DMP and linearity preservation, but lacks the upwind
+character, and its nonlinear problems are considerably harder to solve.
 
 \begin{thebibliography}{9}
 \bibitem{Kn23} P.~Knobloch, An algebraically stabilized method for convection--diffusion--reaction problems with

@@ -1,0 +1,2183 @@
+\documentclass[11pt,a4paper]{article}
+
+% ------------------------------------------------------------------ packages
+\usepackage[a4paper,left=2.6cm,right=2.6cm,top=2.7cm,bottom=2.7cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools,bm}
+\usepackage{booktabs,array,comment}
+\usepackage[shortlabels]{enumitem}
+\usepackage{microtype}
+\usepackage{xcolor}
+\definecolor{linkblue}{RGB}{0,0,140}
+\usepackage{fancyhdr}
+\usepackage[colorlinks=true,linkcolor=linkblue,citecolor=linkblue,urlcolor=linkblue]{hyperref}
+\usepackage[capitalise,noabbrev]{cleveref}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{siunitx}
+
+\numberwithin{equation}{section}
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{3pt plus 1pt}
+\renewcommand{\arraystretch}{1.25}
+\setlist{itemsep=3pt,topsep=4pt}
+\allowdisplaybreaks
+
+% ------------------------------------------------------------------ headers
+\pagestyle{fancy}
+\fancyhf{}
+% \fancyhead[C]{\small\itshape Time-fractional Oseen equations}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+
+% ------------------------------------------------------------------ theorems
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+\crefname{assumption}{Assumption}{Assumptions}
+
+% ------------------------------------------------------------------ macros
+\newcommand{\CD}{{}^{C}\!D_{0,t}^{\alpha}}   % Caputo derivative
+\newcommand{\RL}{\partial_t^{-\alpha}}    % Riemann--Liouville integral
+\newcommand{\nrm}[1]{|||#1|||_h}      % energy norm
+\newcommand{\Dt}{D_\tau^{\alpha}}     % discrete Caputo derivative
+\newcommand{\bmb}{\boldsymbol b}
+\DeclareMathOperator{\diam}{diam}
+
+\begin{document}
+
+% ------------------------------------------------------------------ title
+\begin{center}
+{\LARGE\bfseries Symmetric stabilized finite element methods\\[3pt] for time-fractional Oseen equations\par}
+\vspace{1.2em}
+{\large Naveed Ahmed$^{1}$ \quad and \quad Samir Karaa$^{2}$}\par
+\vspace{0.7em}
+{\small
+$^{1}$\, Department of Mathematics and Natural Sciences, Gulf University for Science and Technology, Kuwait\\
+\texttt{ahmed.n@gust.edu.kw}\\[2pt]
+$^{2}$\, Department of Mathematics, Sultan Qaboos University, Al-Khod 123, Muscat, Oman\\
+\texttt{skaraa@squ.edu.om}\par}
+\end{center}
+\vspace{0.6em}
+
+\begin{abstract}
+\noindent
+We study inf--sup stable finite element discretizations of the 
+time-fractional Oseen equations, stabilized by symmetric convection 
+stabilization (local projection, continuous interior penalty, orthogonal 
+subscale, or subgrid scale) and grad-div stabilization, for homogeneous 
+Dirichlet boundary conditions and with an optional reaction term. We prove 
+stability and error estimates for the semi-discrete problem and for the L1 
+time discretization. The error analysis compares the discrete solution with 
+a Fortin-type interpolant rather than a Stokes/Ritz projection; the $L^2$ 
+norm of the error is controlled by a fractional Gronwall argument, and 
+the pressure--divergence coupling by the grad-div term. 
+
+\end{abstract}
+
+\noindent\textbf{Keywords:} time-fractional Oseen equations; Caputo derivative; symmetric stabilisation; grad-div stabilisation; L1 scheme.\\
+\textbf{MSC 2020:} 65M60, 65M12, 35R11, 76D07.
+
+% =====================================================================
+\section{Introduction}\label{sec:intro}
+\input{intro-semi-disc.tex}
+\input{space-disc.tex}
+% =====================================================================
+\section{Fully discrete schemes}
+\label{sec:full}
+
+%\subsection{The uniform L1 scheme}
+
+In this section we analyse a fully discrete scheme based on L1 method \cite{LX}.
+Divide the time interval $[0,T]$ into $N$ equal subintervals with a time step size
+$\tau=T/N$. Let $t_n=n\tau$, $\varphi^n=\varphi(t_n)$, and
+$\kappa=\tau^\alpha$.
+The L1 approximation of the Caputo fractional derivative of $\varphi(t)$ at time $t_n$ is defined by
+\begin{equation}
+\label{eq:Dt}
+\Dt \varphi^n
+=
+\tau^{-\alpha}\sum_{k=1}^n
+\beta_{n-k}(\varphi^k-\varphi^{k-1}),
+\end{equation}
+where
+$
+\beta_j
+=
+[(j+1)^{1-\alpha}-j^{1-\alpha}]/\Gamma(2-\alpha),
+\, j\ge0.
+$
+
+The fully discrete scheme reads as follows:
+given $\bm U_h^0=\bm u_{h,0}$, find
+$(\bm U_h^n,P_h^n)\in\bm V_h\times Q_h$,
+$1\le n\le N$, such that
+\begin{equation}
+\label{eq:fd}
+\begin{aligned}
+(\Dt\bm U_h^n,\bm v_h)
++a_h(\bm U_h^n,\bm v_h)
++b(\bm v_h,P_h^n)
+&=(\bm f^n,\bm v_h),\\
+b(\bm U_h^n,q_h)&=0
+\end{aligned}
+\end{equation}
+for all $(\bm v_h,q_h)\in\bm V_h\times Q_h$.
+At each time level, the resulting saddle-point problem
+is well posed by the coercivity of the bilinear form
+\[
+\beta_0\tau^{-\alpha}(\bm w_h,\bm v_h)
++a_h(\bm w_h,\bm v_h)
+\]
+on the discrete divergence-free subspace and the
+discrete inf-sup condition.
+
+
+Let $\{\chi_j\}_{j\ge0}$ denote the complementary
+L1 weights defined by
+\[
+\sum_{j=k}^n\chi_{n-j}\beta_{j-k}=1,
+\qquad 1\le k\le n.
+\]
+We recall the following standard properties of the L1
+and complementary weights; see, e.g., [--].
+
+\begin{lemma}[Properties of the L1 weights]
+\label{lem:weights}
+The L1 weights $\beta_j$ are positive and decreasing.
+Moreover, for any sequence $\{\bm W^n\}$ in a real
+Hilbert space,
+\[
+2(\Dt\bm W^n,\bm W^n)
+\ge
+\Dt\|\bm W^n\|^2.
+\]
+The complementary weights satisfy $\chi_j\ge0$ and
+\[
+\kappa\sum_{j=1}^n\chi_{n-j}\Dt y^j
+=
+y^n-y^0
+\]
+for any scalar sequence $\{y^n\}$. In addition,
+\[
+\kappa\sum_{j=0}^{n-1}\chi_j
+\le Ct_n^\alpha,
+\qquad 1\le n\le N.
+\]
+\end{lemma}
+
+
+%------------------------
+
+
+
+\begin{lemma}[Discrete fractional Gronwall inequality]
+\label{lem:dgronwall}
+Let $Z^n,G^n\ge0$ and $A\ge0$ satisfy
+\[
+Z^n\le A+\kappa\sum_{j=1}^n
+\chi_{n-j}(Z^j+G^j),
+\qquad 1\le n\le N.
+\]
+If $\kappa\chi_0\le 1/2$, then
+\[
+Z^n\le C_{T,\alpha}\left(
+A+\max_{1\le m\le n}
+\kappa\sum_{j=1}^m\chi_{m-j}G^j
+\right),
+\qquad 1\le n\le N,
+\]
+where $C_{T,\alpha}$ is independent of $h$ and $\tau$.
+\end{lemma}
+
+%--------------------
+
+\begin{comment}
+
+\begin{proof}
+Fix $n\le N$ and set
+\[
+D=A+\max_{1\le m\le n}
+\kappa\sum_{j=1}^m\chi_{m-j}G^j.
+\]
+Then
+\begin{equation}\label{eq:dg-basic}
+Z^m\le D+\kappa\sum_{j=1}^m
+\chi_{m-j}Z^j,\qquad 1\le m\le n.
+\end{equation}
+By Lemma~\ref{lem:weights},
+\[
+\kappa\sum_{j=0}^{\ell-1}\chi_j
+\le C_\alpha(\ell\tau)^\alpha.
+\]
+Choose $\delta>0$ such that
+$C_\alpha\delta^\alpha\le1/2$, and partition
+$\{1,\ldots,n\}$ into consecutive blocks of length
+at most
+\[
+L=\max\{1,\lfloor\delta/\tau\rfloor\}.
+\]
+For any block $\{a,\ldots,b\}$ and $a\le m\le b$,
+\begin{equation}\label{eq:dg-block}
+\kappa\sum_{j=a}^m\chi_{m-j}\le\frac12.
+\end{equation}
+Indeed, this follows from the cumulative weight
+bound when $\tau\le\delta$, and from
+$\kappa\chi_0\le1/2$ when $\tau>\delta$.
+
+Let $M_k$ denote the maximum of $Z^j$ over the
+first $k$ blocks, with $M_0=0$.
+For the first block, \eqref{eq:dg-basic} and
+\eqref{eq:dg-block} give
+\[
+M_1\le 2D.
+\]
+For a subsequent block $\{a,\ldots,b\}$,
+splitting the convolution at $a$ yields
+\[
+Z^m
+\le D+C_\alpha T^\alpha M_{k-1}
++\frac12 M_k,
+\qquad a\le m\le b.
+\]
+Taking the maximum over the current block
+and combining it with the bound for the
+preceding blocks, we obtain
+\[
+M_k\le
+2D+(1+2C_\alpha T^\alpha)M_{k-1}.
+\]
+Consequently,
+\[
+M_k\le
+2D\sum_{\ell=0}^{k-1}
+(1+2C_\alpha T^\alpha)^\ell.
+\]
+The number of blocks is bounded by
+$1+2T/\delta$, independently of $\tau$.
+Hence $M_k\le C_{T,\alpha}D$, which proves
+the assertion.
+\end{proof}
+
+
+\end{comment}
+
+%-------------------------
+
+
+
+\begin{theorem}[Fully discrete stability]
+\label{thm:fdstab}
+The solution of \eqref{eq:fd} satisfies
+\[
+\frac12\Dt\|\bm U_h^n\|^2
++\nrm{\bm U_h^n}^2
+\le(\bm f^n,\bm U_h^n),
+\qquad 1\le n\le N.
+\]
+If $\kappa\chi_0\le1/2$, then
+\[
+\|\bm U_h^n\|^2
++\kappa\sum_{j=1}^n
+\chi_{n-j}\nrm{\bm U_h^j}^2
+\le C_{T,\alpha}
+\left(
+\|\bm U_h^0\|^2
++\max_{1\le m\le n}
+\kappa\sum_{j=1}^m
+\chi_{m-j}\|\bm f^j\|^2
+\right).
+\]
+%where $C_{T,\alpha}$ is independent of $h$ and $\tau$.
+If $\mu>0$, then, for every $\tau>0$,
+\[
+\|\bm U_h^n\|^2
++\kappa\sum_{j=1}^n
+\chi_{n-j}\nrm{\bm U_h^j}^2\le
+\|\bm U_h^0\|^2
++\mu^{-1}\kappa\sum_{j=1}^n
+\chi_{n-j}\|\bm f^j\|^2.
+\]
+\end{theorem}
+
+\begin{proof}
+Taking $\bm v_h=\bm U_h^n$ and $q_h=P_h^n$
+in \eqref{eq:fd}, the discrete incompressibility
+constraint and Lemma~\ref{lem:weights} give the first estimate.
+By Young's inequality,
+\begin{equation}\label{eq:fdstab-energy}
+\Dt Z^n+2\nrm{\bm U_h^n}^2
+\le Z^n+G^n,
+\end{equation}
+where
+$Z^n=\|\bm U_h^n\|^2$ and $G^n=\|\bm f^n\|^2.$
+Multiplying \eqref{eq:fdstab-energy} at time level
+$j$ by $\kappa\chi_{n-j}$, summing over
+$j=1,\ldots,n$, and using Lemma~\ref{lem:weights},
+we obtain
+\begin{equation}\label{eq:fdstab-conv}
+Z^n+2\kappa\sum_{j=1}^n
+\chi_{n-j}\nrm{\bm U_h^j}^2
+\le Z^0+\kappa\sum_{j=1}^n
+\chi_{n-j}(Z^j+G^j).
+\end{equation}
+Dropping the nonnegative energy term and applying
+Lemma~\ref{lem:dgronwall} yields
+\begin{equation}\label{eq:fdstab-Z}
+Z^n\le C_{T,\alpha}
+\left(
+Z^0+\max_{1\le m\le n}
+\kappa\sum_{j=1}^m\chi_{m-j}G^j
+\right).
+\end{equation}
+Since this estimate holds at every time level
+$j\le n$, the positivity of $\chi_j$ and
+Lemma~\ref{lem:weights} imply
+\[
+\begin{aligned}
+\kappa\sum_{j=1}^n\chi_{n-j}Z^j
+&\le C_{T,\alpha}
+\left(
+Z^0+\max_{1\le m\le n}
+\kappa\sum_{k=1}^m\chi_{m-k}G^k
+\right)
+\kappa\sum_{j=0}^{n-1}\chi_j\\
+&\le C_{T,\alpha}
+\left(
+Z^0+\max_{1\le m\le n}
+\kappa\sum_{k=1}^m\chi_{m-k}G^k
+\right).
+\end{aligned}
+\]
+Substituting this bound and \eqref{eq:fdstab-Z}
+into \eqref{eq:fdstab-conv} proves the second
+assertion.
+%
+If $\mu>0$, then
+$\nrm{\bm U_h^n}^2\ge\mu\|\bm U_h^n\|^2$.
+Consequently,
+\[
+(\bm f^n,\bm U_h^n)
+\le\mu^{-1/2}\|\bm f^n\|
+\nrm{\bm U_h^n}\\
+\le\frac12\nrm{\bm U_h^n}^2
++\frac1{2\mu}\|\bm f^n\|^2.
+\]
+The first stability inequality therefore gives
+$
+\Dt Z^n+\nrm{\bm U_h^n}^2
+\le\mu^{-1}G^n.
+$
+Multiplying by $\kappa\chi_{n-j}$ at time
+level $j$, summing over $j=1,\ldots,n$, and
+using the complementary-weight identity in
+Lemma~\ref{lem:weights} yields
+\[
+Z^n+\kappa\sum_{j=1}^n
+\chi_{n-j}\nrm{\bm U_h^j}^2
+\le Z^0+\mu^{-1}\kappa\sum_{j=1}^n
+\chi_{n-j}G^j.
+\]
+This completes the proof.
+\end{proof}
+
+%-------------------
+
+\begin{comment}
+
+\begin{remark}[Unconditional stability]
+\label{rem:unconditional-stability}
+Under homogeneous Dirichlet boundary conditions, the
+Poincar\'e inequality implies
+\[
+\nrm{\bm v_h}^2
+\ge \lambda_0\|\bm v_h\|^2,
+\qquad
+\lambda_0=\mu+\frac{\nu}{C_P^2}>0.
+\]
+Consequently, the argument used for $\mu>0$ in
+Theorem~\ref{thm:fdstab} yields
+\[
+\begin{aligned}
+&\|\bm U_h^n\|^2
++\kappa\sum_{j=1}^n
+\chi_{n-j}\nrm{\bm U_h^j}^2\\
+&\qquad\le
+\|\bm U_h^0\|^2
++\lambda_0^{-1}\kappa\sum_{j=1}^n
+\chi_{n-j}\|\bm f^j\|^2.
+\end{aligned}
+\]
+Thus, the fully discrete scheme is unconditionally
+stable for every $\mu\ge0$, without any restriction
+on the time step.
+\end{remark}
+
+
+\end{comment}
+%--------------------
+
+\paragraph{Temporal consistency.}
+Let $\mathcal R^n$ denote the consistency error
+of the L1 approximation,
+\[
+\mathcal R^n
+:=\Dt\bm u^n-\CD\bm u(t_n),
+\qquad
+\bm u^n=\bm u(t_n).
+\]
+We recall the standard error estimate of the L1 method; see \cite{LX}.
+
+\begin{lemma}
+\label{lem:cons}
+Let $X$ be a Banach space and
+$u\in C^2([0,T];X)$. Then
+\[
+\|\Dt u^n-\CD u(t_n)\|_X
+\le
+C\tau^{2-\alpha}
+\max_{t\in[0,T]}
+\|\partial_t^2 u(t)\|_X,
+\qquad 1\le n\le N,
+\]
+where $C>0$ may depend on $\alpha$, but is
+independent of $\tau$ and $n$.
+\end{lemma}
+
+
+%----------------------------------
+
+\begin{comment}
+
+\begin{lemma}[Increment of the L1 consistency error]
+\label{lem:L1_increment}
+Let $X$ be a Hilbert space and let $0<\alpha<1$.
+Suppose that
+\[
+u\in C^3([0,T];X),\qquad
+u^{(4)}\in L^\infty(0,T;X),
+\qquad u''(0)=0.
+\]
+Let
+\[
+\mathcal R^n
+=D_\tau^\alpha u^n-{}^CD_t^\alpha u(t_n),
+\qquad \mathcal R^0=0.
+\]
+Then, for $0\le n\le N-1$,
+\[
+\|\mathcal R^{n+1}-\mathcal R^n\|_X
+\le C_{\alpha,T}\tau^{3-\alpha}
+\left(
+\|u^{(3)}\|_{L^\infty(0,T;X)}
++
+\|u^{(4)}\|_{L^\infty(0,T;X)}
+\right).
+\]
+\end{lemma}
+
+\end{comment}
+
+%-----------------------
+
+We are now ready to derive the fully discrete velocity error estimate.
+
+\begin{theorem}[Fully discrete velocity error]
+\label{thm:fderr}
+Assume the hypotheses of Section~\ref{sec:error}
+and suppose that
+$\tau^\alpha\Gamma(2-\alpha)\le 1/2$.
+In addition, let
+\[
+\bm u\in
+C^2\bigl([0,T];[H^{r+1}\cap H_0^1]^2\bigr).
+\]
+Then, for $1\le n\le N$,
+\[
+\begin{aligned}
+&\|\bm U_h^n-\bm u^n\|^2
++\kappa\sum_{j=1}^n
+\chi_{n-j}\nrm{\bm U_h^j-\bm u^j}^2\\
+&\qquad\le C_{T,\alpha}\left[
+\|\bm U_h^0-\bm I_h\bm u^0\|^2
++h^{2(r+1)}
++\tau^{2(2-\alpha)}
++\max_{1\le j\le n}
+\vartheta_h(t_j)^2
+\right],
+\end{aligned}
+\]
+where $C_{T,\alpha}$ is independent of $h$,
+$\tau$, and negative powers of $\nu$,
+but may depend on the solution norms.
+In particular, if
+$\bm U_h^0=\bm I_h\bm u^0$, then
+\[
+\|\bm U_h^n-\bm u^n\|
+=
+O\bigl(
+c_hh^r+\gamma^{-1/2}h^{s+1}
++h^{r+1}+\tau^{2-\alpha}
+\bigr),
+\qquad 1\le n\le N.
+\]
+%provided the corresponding solution norms remain bounded.
+\end{theorem}
+
+
+
+%--------------------------------
+
+
+
+
+\begin{proof}
+Let
+$
+\bm\zeta^n=\bm U_h^n-\bm I_h\bm u^n,$  
+$\bm w^n=\bm u^n-\bm I_h\bm u^n,$
+and $q_h^n\in Q_h$ be a best approximation
+of $p^n$.
+Since
+$\CD\bm u(t_n)=\Dt\bm u^n-\mathcal R^n$,
+subtracting the continuous problem at $t_n$
+from \eqref{eq:fd} gives
+\begin{equation}\label{eq:fd-err}
+\begin{aligned}
+&(\Dt\bm\zeta^n,\bm v_h)
++a_h(\bm\zeta^n,\bm v_h)
++b(\bm v_h,P_h^n-p^n)\\
+&\qquad=
+(\Dt\bm w^n-\mathcal R^n,\bm v_h)
++a(\bm w^n,\bm v_h)+
+\gamma(\nabla\cdot\bm w^n,
+       \nabla\cdot\bm v_h)
+-S_h(\bm I_h\bm u^n,\bm v_h).
+\end{aligned}
+\end{equation}
+%
+By the discrete incompressibility constraint
+and the Fortin property,
+\[
+b(\bm\zeta^n,q_h)=0
+\qquad\forall q_h\in Q_h.
+\]
+Taking $\bm v_h=\bm\zeta^n$ in
+\eqref{eq:fd-err}, using
+Lemma~\ref{lem:interp}, Young's inequality,
+and the discrete energy inequality in
+Lemma~\ref{lem:weights}, we obtain
+\begin{equation}\label{eq:fd-G}
+\Dt\|\bm\zeta^n\|^2
++\nrm{\bm\zeta^n}^2
+\le
+\|\bm\zeta^n\|^2+G^n,
+\end{equation}
+where
+$
+G^n=A_n^2+B_n^2,
+$
+with
+\[
+\begin{aligned}
+A_n={}&
+\|\Dt\bm w^n\|
++\|\mathcal R^n\|
++\|\bmb\|_{L^\infty}\|\nabla\bm w^n\|
++\mu\|\bm w^n\|,
+\\
+B_n={}&C\bigl[
+(\sqrt\nu+\sqrt\gamma+\sqrt h)
+h^r\|\bm u^n\|_{r+1}
++\gamma^{-1/2}h^{s+1}\|p^n\|_{s+1}
+\bigr].
+\end{aligned}
+\]
+%
+Since $\bm I_h$ is linear and independent of time,
+$
+\Dt\bm w^n=(I-\bm I_h)\Dt\bm u^n.
+$
+The approximation properties of $\bm I_h$
+and the definition of the L1 operator imply
+\[
+\|\Dt\bm w^n\|
+\le Ch^{r+1}\|\Dt\bm u^n\|_{r+1}
+\le C_{T,\alpha}h^{r+1}
+\max_{0\le t\le T}
+\|\partial_t\bm u(t)\|_{r+1}.
+\]
+Moreover, Lemma~\ref{lem:cons} gives
+\[
+\|\mathcal R^n\|
+\le C_\alpha\tau^{2-\alpha}
+\max_{0\le t\le T}
+\|\partial_t^2\bm u(t)\|.
+\]
+Consequently, by the regularity assumptions
+and Lemma~\ref{lem:interp},
+\begin{equation}\label{eq:fd-G-bound}
+G^n\le C_{T,\alpha}
+\left(
+h^{2(r+1)}
++\tau^{2(2-\alpha)}
++\vartheta_h(t_n)^2
+\right).
+\end{equation}
+%
+Multiplying \eqref{eq:fd-G} at time level $j$
+by $\kappa\chi_{n-j}$, summing over
+$j=1,\ldots,n$, and using the complementary-weight
+identity yields
+\begin{equation}\label{eq:fd-weighted}
+\|\bm\zeta^n\|^2
++\kappa\sum_{j=1}^n
+\chi_{n-j}\nrm{\bm\zeta^j}^2\le
+\|\bm\zeta^0\|^2
++\kappa\sum_{j=1}^n
+\chi_{n-j}
+\left(\|\bm\zeta^j\|^2+G^j\right).
+\end{equation}
+%
+Dropping the nonnegative energy term
+and applying Lemma~\ref{lem:dgronwall},
+under the condition
+$\tau^\alpha\Gamma(2-\alpha)\le1/2$,
+we obtain
+\begin{equation}\label{eq:fd-zeta-L2}
+\|\bm\zeta^n\|^2
+\le C_{T,\alpha}
+\left(
+\|\bm\zeta^0\|^2
++\max_{1\le m\le n}
+\kappa\sum_{j=1}^m
+\chi_{m-j}G^j
+\right).
+\end{equation}
+%
+By \eqref{eq:fd-G-bound}, the positivity
+of the complementary weights, and
+Lemma~\ref{lem:weights},
+\[
+\max_{1\le m\le n}
+\kappa\sum_{j=1}^m\chi_{m-j}G^j
+\le C_{T,\alpha}
+\left(
+h^{2(r+1)}
++\tau^{2(2-\alpha)}
++\max_{1\le j\le n}\vartheta_h(t_j)^2
+\right).
+\]
+Hence,
+\begin{equation}\label{eq:fd-zeta-bound}
+\|\bm\zeta^n\|^2
+\le C_{T,\alpha}\bigg[
+\|\bm\zeta^0\|^2
++h^{2(r+1)}
++\tau^{2(2-\alpha)}
++\max_{1\le j\le n}
+\vartheta_h(t_j)^2
+\bigg].
+\end{equation}
+%
+Applying \eqref{eq:fd-zeta-bound}
+at each time level $j\le n$,
+and using the positivity and bounded sum
+of the complementary weights in
+\eqref{eq:fd-weighted}, we conclude that
+\begin{equation}\label{eq:fd-zeta-energy}
+\begin{aligned}
+&\|\bm\zeta^n\|^2
++\kappa\sum_{j=1}^n
+\chi_{n-j}\nrm{\bm\zeta^j}^2\\
+&\qquad\le C_{T,\alpha}\bigg[
+\|\bm\zeta^0\|^2
++h^{2(r+1)}
++\tau^{2(2-\alpha)}
++\max_{1\le j\le n}
+\vartheta_h(t_j)^2
+\bigg].
+\end{aligned}
+\end{equation}
+%
+Finally, since
+$
+\bm U_h^n-\bm u^n
+=\bm\zeta^n-\bm w^n,
+$
+the triangle inequality and
+Lemma~\ref{lem:interp} give
+\[
+\begin{aligned}
+\|\bm U_h^n-\bm u^n\|^2
+&\le
+2\|\bm\zeta^n\|^2+2\|\bm w^n\|^2,\\
+\nrm{\bm U_h^j-\bm u^j}^2
+&\le
+2\nrm{\bm\zeta^j}^2
++2\nrm{\bm w^j}^2,
+\end{aligned}
+\]
+where
+$
+\|\bm w^j\|^2+\nrm{\bm w^j}^2
+\le C\vartheta_h(t_j)^2.
+$
+Combining these bounds with
+\eqref{eq:fd-zeta-energy} and
+Lemma~\ref{lem:weights}
+proves the asserted estimate.
+
+If $\bm U_h^0=\bm I_h\bm u^0$,
+then $\bm\zeta^0=0$, and the stated
+convergence rate follows from the
+spatial approximation estimates.
+\end{proof}
+%----------------------------
+
+
+\begin{proposition}[Fully discrete integrated pressure error]
+\label{prop:fdpressure}
+Assume the hypotheses of Theorem~\ref{thm:fderr}.
+Then, for $1\le n\le N$,
+\[
+\left\|
+\kappa\sum_{j=1}^n
+\chi_{n-j}(P_h^j-p^j)
+\right\|\le C_{T,\alpha,\beta_1}
+(1+M_h)
+\left(
+\|\bm\zeta^0\|
++h^{r+1}
++\tau^{2-\alpha}
++\max_{1\le j\le n}\vartheta_h(t_j)
+\right),
+\]
+where
+$
+\bm\zeta^0=\bm U_h^0-\bm I_h\bm u^0,
+$
+and $C_{T,\alpha,\beta_1}$ is independent
+of $h$, $\tau$, and negative powers of $\nu$.
+\end{proposition}
+
+
+\begin{proof}
+Let
+\[
+\widetilde\rho^n
+=
+\kappa\sum_{j=1}^n
+\chi_{n-j}(P_h^j-q_h^j),
+\qquad
+\widetilde{\bm\zeta}^n
+=
+\kappa\sum_{j=1}^n
+\chi_{n-j}\bm\zeta^j,
+\]
+where $q_h^j\in Q_h$ is a best approximation
+of $p^j$.
+Adding $b(\bm v_h,p^j-q_h^j)$ to both sides
+of \eqref{eq:fd-err}, multiplying the resulting
+identity by $\kappa\chi_{n-j}$, and summing over
+$j=1,\ldots,n$, we obtain
+\[
+\begin{aligned}
+b(\bm v_h,\widetilde\rho^n)
+={}&
+-(\bm\zeta^n-\bm\zeta^0,\bm v_h)
+-a_h(\widetilde{\bm\zeta}^n,\bm v_h)
++(\bm w^n-\bm w^0,\bm v_h)
+\\
+&+\kappa\sum_{j=1}^n\chi_{n-j}
+\Bigl[
+-(\mathcal R^j,\bm v_h)
++a(\bm w^j,\bm v_h)
+\\
+&\qquad+
+\gamma(\nabla\cdot\bm w^j,
+       \nabla\cdot\bm v_h)
+-S_h(\bm I_h\bm u^j,\bm v_h)
++
+b(\bm v_h,p^j-q_h^j)
+\Bigr],
+\end{aligned}
+\]
+where we have used
+\[
+\kappa\sum_{j=1}^n
+\chi_{n-j}\Dt\bm\zeta^j
+=
+\bm\zeta^n-\bm\zeta^0,
+\qquad
+\kappa\sum_{j=1}^n
+\chi_{n-j}\Dt\bm w^j
+=
+\bm w^n-\bm w^0.
+\]
+%
+By the discrete inf--sup condition,
+the continuity estimates for the bilinear
+forms, and Lemma~\ref{lem:interp},
+\[
+\begin{aligned}
+\beta_1\|\widetilde\rho^n\|
+\le C\Bigg[
+&\|\bm\zeta^n\|+\|\bm\zeta^0\|
++\|\bm w^n\|+\|\bm w^0\|
+\\
+&+\kappa\sum_{j=1}^n\chi_{n-j}
+\Bigl(
+M_h\nrm{\bm\zeta^j}
++\|\bm\zeta^j\|
++\|\mathcal R^j\|
++\vartheta_h(t_j)
+\Bigr)
+\Bigg].
+\end{aligned}
+\]
+%
+For brevity, set
+\[
+E_n=
+\|\bm\zeta^0\|
++h^{r+1}
++\tau^{2-\alpha}
++\max_{1\le j\le n}\vartheta_h(t_j).
+\]
+By Theorem~\ref{thm:fderr} and its proof,
+\[
+\max_{1\le j\le n}\|\bm\zeta^j\|
++
+\left(
+\kappa\sum_{j=1}^n
+\chi_{n-j}\nrm{\bm\zeta^j}^2
+\right)^{1/2}
+\le C_{T,\alpha}E_n.
+\]
+Consequently, the Cauchy--Schwarz inequality
+and Lemma~\ref{lem:weights} give
+\[
+\kappa\sum_{j=1}^n
+\chi_{n-j}
+\left(
+M_h\nrm{\bm\zeta^j}
++\|\bm\zeta^j\|
+\right)
+\le C_{T,\alpha}(1+M_h)E_n.
+\]
+%
+Moreover, Lemmas~\ref{lem:cons}
+and~\ref{lem:weights} yield
+\[
+\kappa\sum_{j=1}^n
+\chi_{n-j}\|\mathcal R^j\|
+\le C_{T,\alpha}\tau^{2-\alpha}.
+\]
+The interpolation estimates imply
+$
+\|\bm w^n\|+\|\bm w^0\|
+\le Ch^{r+1},
+$
+while
+\[
+\kappa\sum_{j=1}^n
+\chi_{n-j}\vartheta_h(t_j)
+\le C_{T,\alpha}
+\max_{1\le j\le n}\vartheta_h(t_j).
+\]
+Combining these bounds gives
+\[
+\|\widetilde\rho^n\|
+\le C_{T,\alpha,\beta_1}(1+M_h)E_n.
+\]
+%
+Finally,
+$
+P_h^j-p^j
+=(P_h^j-q_h^j)+(q_h^j-p^j),
+$
+and hence
+\[
+\left\|
+\kappa\sum_{j=1}^n
+\chi_{n-j}(P_h^j-p^j)
+\right\|
+\le
+\|\widetilde\rho^n\|
++
+\kappa\sum_{j=1}^n
+\chi_{n-j}\|q_h^j-p^j\|.
+\]
+By the pressure approximation estimate
+and Lemma~\ref{lem:weights}, we have
+\[
+\kappa\sum_{j=1}^n
+\chi_{n-j}\|q_h^j-p^j\|
+\le C_{T,\alpha}
+\max_{1\le j\le n}\vartheta_h(t_j),
+\]
+which completes the proof.
+\end{proof}
+
+
+
+%---------------------------- qqq
+
+
+
+
+\begin{proposition}[Conditional pointwise pressure error]
+\label{prop:pointwise-pressure}
+Assume the hypotheses of Theorem~\ref{thm:fderr}.
+Then, for $1\le n\le N$,
+\[
+\begin{aligned}
+\beta_1\|P_h^n-p^n\|
+\le {}&
+C_F\|\Dt\bm\zeta^n\|
++M_h\nrm{\bm\zeta^n}
+\\
+&+C_{T,\alpha}
+\left(
+\|\bm\zeta^0\|
++h^{r+1}
++\tau^{2-\alpha}
++\max_{1\le j\le n}\vartheta_h(t_j)
+\right),
+\end{aligned}
+\]
+where
+$
+\bm\zeta^n=\bm U_h^n-\bm I_h\bm u^n.
+$
+The constant $C_{T,\alpha}$ may depend on
+$\|\bm b\|_{L^\infty}$ and fixed upper bounds
+for $\nu$, $\gamma$, and $\mu$, but is independent
+of $h$, $\tau$, and negative powers of $\nu$.
+\end{proposition}
+
+%------------------------------
+
+
+\begin{proof}
+Let $q_h^n\in Q_h$ be an approximation of $p^n$.
+Rearranging the error equation \eqref{eq:fd-err}
+and adding $b(\bm v_h,p^n-q_h^n)$ gives
+\[
+\begin{aligned}
+b(\bm v_h,P_h^n-q_h^n)
+={}&
+-(\Dt\bm\zeta^n,\bm v_h)
+-a_h(\bm\zeta^n,\bm v_h)
+\\
+&+(\Dt\bm w^n-\mathcal R^n,\bm v_h)
++a(\bm w^n,\bm v_h)
+\\
+&+\gamma(\nabla\cdot\bm w^n,
+         \nabla\cdot\bm v_h)
+-S_h(\bm I_h\bm u^n,\bm v_h)
+\\
+&+b(\bm v_h,p^n-q_h^n),
+\end{aligned}
+\]
+for every $\bm v_h\in\bm V_h$, where
+$\bm w^n=\bm u^n-\bm I_h\bm u^n$.
+%
+By the Friedrichs inequality and the
+continuity estimate for $a_h$,
+\[
+\begin{aligned}
+|(\Dt\bm\zeta^n,\bm v_h)|
+&\le C_F\|\Dt\bm\zeta^n\|
+\|\nabla\bm v_h\|,\\
+|a_h(\bm\zeta^n,\bm v_h)|
+&\le
+\left(
+M_h\nrm{\bm\zeta^n}
++\|\bm b\|_{L^\infty}\|\bm\zeta^n\|
+\right)
+\|\nabla\bm v_h\|.
+\end{aligned}
+\]
+The remaining terms are bounded using
+Lemma~\ref{lem:interp} and the continuity
+estimates for the bilinear forms. Thus,
+\[
+\begin{aligned}
+|b(\bm v_h,P_h^n-q_h^n)|
+\le\Bigl[
+&C_F\|\Dt\bm\zeta^n\|
++M_h\nrm{\bm\zeta^n}
+\\
+&+\|\bm b\|_{L^\infty}\|\bm\zeta^n\|
++C_F\|\Dt\bm w^n\|
+\\
+&+C_F\|\mathcal R^n\|
++C\vartheta_h(t_n)
+\Bigr]\|\nabla\bm v_h\|.
+\end{aligned}
+\]
+Since $P_h^n-q_h^n\in Q_h$, the discrete
+inf--sup condition yields
+\begin{equation}\label{eq:fd-pressure-intermediate}
+\begin{aligned}
+\beta_1\|P_h^n-q_h^n\|
+\le {}&
+C_F\|\Dt\bm\zeta^n\|
++M_h\nrm{\bm\zeta^n}
+\\
+&+\|\bm b\|_{L^\infty}\|\bm\zeta^n\|
++C_F\|\Dt\bm w^n\|
+\\
+&+C_F\|\mathcal R^n\|
++C\vartheta_h(t_n).
+\end{aligned}
+\end{equation}
+%
+By the interpolation estimate and
+Lemma~\ref{lem:cons},
+\[
+\|\Dt\bm w^n\|
+\le C_{T,\alpha}h^{r+1},
+\qquad
+\|\mathcal R^n\|
+\le C_\alpha\tau^{2-\alpha}.
+\]
+Furthermore, Theorem~\ref{thm:fderr}
+and its proof imply
+\[
+\|\bm\zeta^n\|
+\le C_{T,\alpha}
+\left(
+\|\bm\zeta^0\|
++h^{r+1}
++\tau^{2-\alpha}
++\max_{1\le j\le n}\vartheta_h(t_j)
+\right).
+\]
+%
+Substituting these estimates into
+\eqref{eq:fd-pressure-intermediate}, we obtain
+\[
+\begin{aligned}
+\beta_1\|P_h^n-q_h^n\|
+\le {}&
+C_F\|\Dt\bm\zeta^n\|
++M_h\nrm{\bm\zeta^n}
+\\
+&+C_{T,\alpha}
+\left(
+\|\bm\zeta^0\|
++h^{r+1}
++\tau^{2-\alpha}
++\max_{1\le j\le n}\vartheta_h(t_j)
+\right).
+\end{aligned}
+\]
+%
+Finally, the triangle inequality gives
+\[
+\beta_1\|P_h^n-p^n\|
+\le
+\beta_1\|P_h^n-q_h^n\|
++\beta_1\|q_h^n-p^n\|.
+\]
+Using the pressure approximation estimate
+\[
+\|q_h^n-p^n\|
+\le C\vartheta_h(t_n),
+\]
+and absorbing the resulting term into
+the constant proves the assertion.
+\end{proof}
+
+
+%-------------------------------
+
+\begin{remark}\label{rem:final}
+Proposition~\ref{prop:fdpressure} provides an estimate
+for the fractionally integrated pressure error without
+requiring additional pointwise bounds. In contrast,
+the pointwise pressure estimate in
+Proposition~\ref{prop:pointwise-pressure} is conditional,
+since Theorem~\ref{thm:fderr} controls the weighted
+energy error
+\[
+\kappa\sum_{j=1}^n
+\chi_{n-j}\nrm{\bm\zeta^j}^2,
+\]
+but does not provide pointwise bounds for
+$\nrm{\bm\zeta^n}$ or $\|\Dt\bm\zeta^n\|$.
+If these quantities satisfy
+\[
+\|\Dt\bm\zeta^n\|
++M_h\nrm{\bm\zeta^n}
+\le C_{T,\alpha}
+\left(
+\|\bm\zeta^0\|
++h^{r+1}
++\tau^{2-\alpha}
++\max_{1\le j\le n}\vartheta_h(t_j)
+\right),
+\]
+then Proposition~\ref{prop:pointwise-pressure}
+yields
+\[
+\|P_h^n-p^n\|
+\le C_{T,\alpha,\beta_1}
+\left(
+\|\bm\zeta^0\|
++h^{r+1}
++\tau^{2-\alpha}
++\max_{1\le j\le n}\vartheta_h(t_j)
+\right).
+\]
+In particular, if
+$\bm U_h^0=\bm I_h\bm u^0$,
+the resulting convergence rate is
+\[
+\|P_h^n-p^n\|
+=
+O\left(
+c_hh^r+\gamma^{-1/2}h^{s+1}
++h^{r+1}+\tau^{2-\alpha}
+\right).
+\]
+The numerical experiments presented below examine
+the pointwise pressure convergence behaviour
+and compare the observed rates with this
+conditional estimate.
+\end{remark}
+
+
+
+
+
+%=====================================
+
+
+
+\section{Numerical studies}  
+\label{sec:numerics}
+
+We present two numerical examples to illustrate the theoretical results and assess the 
+performance of the proposed stabilized finite element methods. The first example 
+considers a smooth analytical solution, for which we examine spatial and temporal 
+convergence separately. The second example considers a solution with weak temporal 
+regularity near the initial time and investigates how this reduced regularity affects 
+temporal convergence.
+
+All computations are performed on triangular meshes obtained by partitioning
+$\Omega=(-1,1)^2$ into an $N\times N$ array of congruent squares and dividing
+each square along a diagonal. The resulting mesh consists of $2N^2$ triangles
+with mesh size $h=2/N$. For the spatial discretization, we use the inf-sup
+stable Taylor--Hood $\mathbb{P}_2/\mathbb{P}_1$ finite element pair.
+
+Grad-div stabilization with parameter $\gamma_{\mathrm{gd}}=1$ is employed in
+all computations. We consider the continuous interior penalty (CIP) and local
+projection stabilization (LPS) methods, with stabilization parameters
+$
+\gamma_{\mathrm{cip}}=0.01,
+\,
+\tau_K=0.01h,
+$
+respectively. Unless otherwise stated, we take
+\[
+T=1,\qquad
+\nu=10^{-2},\qquad
+\boldsymbol b=(1,1)^\top.
+\]
+% and impose homogeneous Dirichlet boundary conditions for the velocity.
+
+We report the $L^2(\Omega)$ velocity error
+$
+\|\boldsymbol u_h-\boldsymbol u\|,
+$
+the velocity-gradient (stress) error
+$
+\|\nabla(\boldsymbol u_h-\boldsymbol u)\|,
+$
+the discrete energy-norm error, and the $L^2(\Omega)$ pressure error
+$
+\|p_h-p\|.
+$
+All integrals are evaluated using a seven-point Gaussian quadrature rule on
+each triangle.
+
+
+
+\subsection{Example with a smooth solution}
+\label{sec:example1}
+
+Consider the Oseen problem with $\Omega$, $\nu$, $\boldsymbol{b}$, and $T$ as specified above. The right-hand side $\boldsymbol{f}$ is chosen such that
+\begin{equation}
+\boldsymbol{u}(x,y,t)=t^{2}
+\begin{pmatrix}
+\sin(\pi x)\cos(\pi y)\\[2pt]
+-\cos(\pi x)\sin(\pi y)
+\end{pmatrix},
+\qquad
+p(x,y,t)=t^{2}\sin(\pi x)\sin(\pi y),
+\end{equation}
+is the exact solution of \eqref{eq:pde}. The solution is smooth in both space and time and satisfies $\boldsymbol{u}(\cdot,0)=\boldsymbol{0}$, making this example suitable for examining the spatial and temporal convergence of the proposed methods.
+
+We first investigate the spatial convergence. We take
+\[
+N=8,16,32,64, \qquad M=N^2,
+\qquad \alpha\in\{0.4,0.6,0.8\},
+\]
+and use the uniform L1 scheme for the Caputo derivative. With this choice, the temporal error $O(\tau^{2-\alpha})$ is of higher order than the $O(h^2)$ spatial error established in Theorem~\ref{thm:fderr}, allowing the spatial convergence to be observed. The results for the CIP and LPS methods are reported in Tables~\ref{tab:ex1-space-cip} and \ref{tab:ex1-space-lps}, respectively.
+
+The velocity errors exhibit an observed convergence rate close to three for both stabilizations, which is higher than the second-order rate guaranteed by Theorem~\ref{thm:fderr}. The stress, energy-norm, and pressure errors show approximately second-order convergence. The results are consistent across the three values of $\alpha$, indicating that the spatial convergence is essentially unaffected by the fractional order.
+
+We next examine the temporal convergence using the uniform L1
+scheme. A sufficiently fine spatial discretization is used so
+that the spatial error does not influence the observed temporal
+rates. The results for CIP and LPS are presented in
+Tables~\ref{tab:ex1-time-cip} and \ref{tab:ex1-time-lps}.
+For all three values of $\alpha$, the velocity, stress,
+energy-norm, and pressure errors approach the expected rate
+$O(\tau^{2-\alpha})$. Thus, the observed temporal orders
+approach $1.6$, $1.4$, and $1.2$ for $\alpha=0.4$, $0.6$,
+and $0.8$, respectively. The CIP and LPS methods exhibit
+very similar errors and convergence behaviour.
+
+Although the pointwise pressure estimate in
+Theorem~\ref{thm:fd-pressure-pointwise} contains an additional
+first-step contribution, the numerical results exhibit the
+optimal temporal rate $2-\alpha$. This behaviour is consistent with the first-step estimate
+\[
+\|\bm\zeta^1-\bm\zeta^0\|
+\le C\tau^\alpha
+\bigl(\mathcal E_h+\tau^{2-\alpha}\bigr),
+\]
+which would control the additional contribution appearing
+in the pointwise pressure error bound.
+
+\begin{table}[htbp]
+\centering
+\caption{Spatial $L^2$ errors and convergence orders for the L1/CIP
+method with Taylor--Hood $P_2/P_1$ elements.}
+\label{tab:ex1-space-cip}
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{llcc|cc|cc}
+\toprule
+\multirow{2}{*}{Quantity} & \multirow{2}{*}{$N_x\times N_y$}
+& \multicolumn{2}{c|}{$\alpha=0.4$}
+& \multicolumn{2}{c|}{$\alpha=0.6$}
+& \multicolumn{2}{c}{$\alpha=0.8$} \\
+\cmidrule(lr){3-4}
+\cmidrule(lr){5-6}
+\cmidrule(l){7-8}
+& & $L^2$ error & Order
+  & $L^2$ error & Order
+  & $L^2$ error & Order \\
+\midrule
+
+\multirow{5}{*}{Velocity}
+& $4\times4$   & $2.00\times10^{-1}$ & --   & $1.97\times10^{-1}$ & --   & $1.95\times10^{-1}$ & --   \\
+& $8\times8$   & $2.49\times10^{-2}$ & 3.01 & $2.48\times10^{-2}$ & 2.99 & $2.50\times10^{-2}$ & 2.96 \\
+& $16\times16$ & $3.37\times10^{-3}$ & 2.89 & $3.37\times10^{-3}$ & 2.88 & $3.46\times10^{-3}$ & 2.85 \\
+& $32\times32$ & $3.86\times10^{-4}$ & 3.13 & $3.87\times10^{-4}$ & 3.12 & $4.22\times10^{-4}$ & 3.04 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{3}
+& \multicolumn{2}{c|}{3}
+& \multicolumn{2}{c}{3} \\
+
+\addlinespace
+\multirow{5}{*}{Stress}
+& $4\times4$   & $2.29\times10^{0}$  & --   & $2.26\times10^{0}$  & --   & $2.23\times10^{0}$  & --   \\
+& $8\times8$   & $7.34\times10^{-1}$ & 1.64 & $7.32\times10^{-1}$ & 1.63 & $7.30\times10^{-1}$ & 1.61 \\
+& $16\times16$ & $2.12\times10^{-1}$ & 1.79 & $2.11\times10^{-1}$ & 1.79 & $2.11\times10^{-1}$ & 1.79 \\
+& $32\times32$ & $4.88\times10^{-2}$ & 2.12 & $4.88\times10^{-2}$ & 2.12 & $4.88\times10^{-2}$ & 2.12 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c}{2} \\
+
+\addlinespace
+\multirow{5}{*}{Energy norm}
+& $4\times4$   & $7.26\times10^{-1}$ & --   & $7.21\times10^{-1}$ & --   & $7.17\times10^{-1}$ & --   \\
+& $8\times8$   & $1.81\times10^{-1}$ & 2.01 & $1.80\times10^{-1}$ & 2.00 & $1.80\times10^{-1}$ & 2.00 \\
+& $16\times16$ & $3.64\times10^{-2}$ & 2.31 & $3.63\times10^{-2}$ & 2.31 & $3.62\times10^{-2}$ & 2.31 \\
+& $32\times32$ & $6.17\times10^{-3}$ & 2.56 & $6.17\times10^{-3}$ & 2.56 & $6.17\times10^{-3}$ & 2.56 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c}{2} \\
+
+\addlinespace
+\multirow{5}{*}{Pressure}
+& $4\times4$   & $3.30\times10^{-1}$ & --   & $3.30\times10^{-1}$ & --   & $3.30\times10^{-1}$ & --   \\
+& $8\times8$   & $5.92\times10^{-2}$ & 2.48 & $5.92\times10^{-2}$ & 2.48 & $5.92\times10^{-2}$ & 2.48 \\
+& $16\times16$ & $1.33\times10^{-2}$ & 2.15 & $1.33\times10^{-2}$ & 2.15 & $1.33\times10^{-2}$ & 2.15 \\
+& $32\times32$ & $3.24\times10^{-3}$ & 2.04 & $3.24\times10^{-3}$ & 2.04 & $3.24\times10^{-3}$ & 2.04 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c}{2} \\
+
+\bottomrule
+\end{tabular}
+\end{table}
+% =====================================================
+% SPATIAL CONVERGENCE: L1/LPS
+% =====================================================
+\begin{table}[htbp]
+\centering
+\caption{Spatial $L^2$ errors and convergence orders for the L1/LPS
+method with Taylor--Hood $P_2/P_1$ elements.}
+\label{tab:ex1-space-lps}
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{llcc|cc|cc}
+\toprule
+\multirow{2}{*}{Quantity} & \multirow{2}{*}{$N_x\times N_y$}
+& \multicolumn{2}{c|}{$\alpha=0.4$}
+& \multicolumn{2}{c|}{$\alpha=0.6$}
+& \multicolumn{2}{c}{$\alpha=0.8$} \\
+\cmidrule(lr){3-4}
+\cmidrule(lr){5-6}
+\cmidrule(l){7-8}
+& & $L^2$ error & Order
+  & $L^2$ error & Order
+  & $L^2$ error & Order \\
+\midrule
+
+\multirow{5}{*}{Velocity}
+& $4\times4$   & $2.29\times10^{-1}$ & --   & $2.24\times10^{-1}$ & --   & $2.21\times10^{-1}$ & --   \\
+& $8\times8$   & $3.62\times10^{-2}$ & 2.66 & $3.60\times10^{-2}$ & 2.64 & $3.60\times10^{-2}$ & 2.62 \\
+& $16\times16$ & $5.51\times10^{-3}$ & 2.72 & $5.50\times10^{-3}$ & 2.71 & $5.55\times10^{-3}$ & 2.70 \\
+& $32\times32$ & $5.78\times10^{-4}$ & 3.25 & $5.78\times10^{-4}$ & 3.25 & $6.02\times10^{-4}$ & 3.20 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{3}
+& \multicolumn{2}{c|}{3}
+& \multicolumn{2}{c}{3} \\
+
+\addlinespace
+\multirow{5}{*}{Stress}
+& $4\times4$   & $2.68\times10^{0}$  & --   & $2.64\times10^{0}$  & --   & $2.60\times10^{0}$  & --   \\
+& $8\times8$   & $1.04\times10^{0}$  & 1.36 & $1.04\times10^{0}$  & 1.34 & $1.03\times10^{0}$  & 1.33 \\
+& $16\times16$ & $3.40\times10^{-1}$ & 1.62 & $3.39\times10^{-1}$ & 1.62 & $3.38\times10^{-1}$ & 1.61 \\
+& $32\times32$ & $7.25\times10^{-2}$ & 2.23 & $7.24\times10^{-2}$ & 2.23 & $7.23\times10^{-2}$ & 2.22 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c}{2} \\
+
+\addlinespace
+\multirow{5}{*}{Energy norm}
+& $4\times4$   & $7.58\times10^{-1}$ & --   & $7.52\times10^{-1}$ & --   & $7.48\times10^{-1}$ & --   \\
+& $8\times8$   & $2.14\times10^{-1}$ & 1.82 & $2.14\times10^{-1}$ & 1.82 & $2.13\times10^{-1}$ & 1.81 \\
+& $16\times16$ & $4.68\times10^{-2}$ & 2.20 & $4.67\times10^{-2}$ & 2.19 & $4.65\times10^{-2}$ & 2.19 \\
+& $32\times32$ & $7.79\times10^{-3}$ & 2.59 & $7.78\times10^{-3}$ & 2.58 & $7.77\times10^{-3}$ & 2.58 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c}{2} \\
+
+\addlinespace
+\multirow{5}{*}{Pressure}
+& $4\times4$   & $3.31\times10^{-1}$ & --   & $3.31\times10^{-1}$ & --   & $3.31\times10^{-1}$ & --   \\
+& $8\times8$   & $5.92\times10^{-2}$ & 2.48 & $5.92\times10^{-2}$ & 2.48 & $5.92\times10^{-2}$ & 2.48 \\
+& $16\times16$ & $1.33\times10^{-2}$ & 2.15 & $1.33\times10^{-2}$ & 2.15 & $1.33\times10^{-2}$ & 2.15 \\
+& $32\times32$ & $3.24\times10^{-3}$ & 2.04 & $3.24\times10^{-3}$ & 2.04 & $3.24\times10^{-3}$ & 2.04 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c}{2} \\
+
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =====================================================
+% TEMPORAL CONVERGENCE: L1/CIP, EXAMPLE 4.1
+% =====================================================
+\begin{table}[htbp]
+\centering
+\caption{Temporal $L^2$ errors and convergence orders for the L1/CIP
+method with Taylor--Hood $P_2/P_1$ elements.}
+\label{tab:ex1-time-cip}
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{llcc|cc|cc}
+\toprule
+\multirow{2}{*}{Quantity} & \multirow{2}{*}{$M$}
+& \multicolumn{2}{c|}{$\alpha=0.4$}
+& \multicolumn{2}{c|}{$\alpha=0.6$}
+& \multicolumn{2}{c}{$\alpha=0.8$} \\
+\cmidrule(lr){3-4}
+\cmidrule(lr){5-6}
+\cmidrule(l){7-8}
+& & $L^2$ error & Order
+  & $L^2$ error & Order
+  & $L^2$ error & Order \\
+\midrule
+
+\multirow{5}{*}{Velocity}
+& 16  & $3.89\times10^{-3}$ & --   & $1.06\times10^{-2}$ & --   & $2.55\times10^{-2}$ & --   \\
+& 32  & $1.33\times10^{-3}$ & 1.55 & $4.08\times10^{-3}$ & 1.37 & $1.12\times10^{-2}$ & 1.19 \\
+& 64  & $4.47\times10^{-4}$ & 1.57 & $1.56\times10^{-3}$ & 1.39 & $4.86\times10^{-3}$ & 1.20 \\
+& 128 & $1.49\times10^{-4}$ & 1.59 & $5.87\times10^{-4}$ & 1.41 & $2.08\times10^{-3}$ & 1.22 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{1.6}
+& \multicolumn{2}{c|}{1.4}
+& \multicolumn{2}{c}{1.2} \\
+
+\addlinespace
+\multirow{5}{*}{Stress}
+& 16  & $1.73\times10^{-2}$ & --   & $4.70\times10^{-2}$ & --   & $1.13\times10^{-1}$ & --   \\
+& 32  & $5.89\times10^{-3}$ & 1.55 & $1.81\times10^{-2}$ & 1.37 & $4.97\times10^{-2}$ & 1.19 \\
+& 64  & $1.99\times10^{-3}$ & 1.57 & $6.92\times10^{-3}$ & 1.39 & $2.16\times10^{-2}$ & 1.20 \\
+& 128 & $6.62\times10^{-4}$ & 1.59 & $2.61\times10^{-3}$ & 1.41 & $9.24\times10^{-3}$ & 1.22 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{1.6}
+& \multicolumn{2}{c|}{1.4}
+& \multicolumn{2}{c}{1.2} \\
+
+\addlinespace
+\multirow{5}{*}{Energy norm}
+& 16  & $1.73\times10^{-3}$ & --   & $4.70\times10^{-3}$ & --   & $1.13\times10^{-2}$ & --   \\
+& 32  & $5.89\times10^{-4}$ & 1.55 & $1.81\times10^{-3}$ & 1.37 & $4.97\times10^{-3}$ & 1.19 \\
+& 64  & $1.99\times10^{-4}$ & 1.57 & $6.92\times10^{-4}$ & 1.39 & $2.16\times10^{-3}$ & 1.20 \\
+& 128 & $6.62\times10^{-5}$ & 1.59 & $2.61\times10^{-4}$ & 1.41 & $9.24\times10^{-4}$ & 1.22 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{1.6}
+& \multicolumn{2}{c|}{1.4}
+& \multicolumn{2}{c}{1.2} \\
+
+\addlinespace
+\multirow{5}{*}{Pressure}
+& 16  & $1.09\times10^{-8}$  & --   & $2.92\times10^{-8}$ & --   & $7.10\times10^{-8}$ & --   \\
+& 32  & $3.69\times10^{-9}$  & 1.57 & $1.11\times10^{-8}$ & 1.39 & $3.09\times10^{-8}$ & 1.20 \\
+& 64  & $1.24\times10^{-9}$  & 1.58 & $4.23\times10^{-9}$ & 1.40 & $1.33\times10^{-8}$ & 1.21 \\
+& 128 & $4.10\times10^{-10}$ & 1.59 & $1.59\times10^{-9}$ & 1.41 & $5.69\times10^{-9}$ & 1.23 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{1.6}
+& \multicolumn{2}{c|}{1.4}
+& \multicolumn{2}{c}{1.2} \\
+
+\bottomrule
+\end{tabular}
+\end{table}
+% =====================================================
+% TEMPORAL CONVERGENCE: L1/LPS, EXAMPLE 4.1
+% =====================================================
+\begin{table}[htbp]
+\centering
+\caption{Temporal $L^2$ errors and convergence orders for the L1/LPS
+method with Taylor--Hood $P_2/P_1$ elements.}
+\label{tab:ex1-time-lps}
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{llcc|cc|cc}
+\toprule
+\multirow{2}{*}{Quantity} & \multirow{2}{*}{$M$}
+& \multicolumn{2}{c|}{$\alpha=0.4$}
+& \multicolumn{2}{c|}{$\alpha=0.6$}
+& \multicolumn{2}{c}{$\alpha=0.8$} \\
+\cmidrule(lr){3-4}
+\cmidrule(lr){5-6}
+\cmidrule(l){7-8}
+& & $L^2$ error & Order
+  & $L^2$ error & Order
+  & $L^2$ error & Order \\
+\midrule
+
+\multirow{5}{*}{Velocity}
+& 16  & $3.89\times10^{-3}$ & --   & $1.06\times10^{-2}$ & --   & $2.55\times10^{-2}$ & --   \\
+& 32  & $1.33\times10^{-3}$ & 1.55 & $4.08\times10^{-3}$ & 1.37 & $1.12\times10^{-2}$ & 1.19 \\
+& 64  & $4.47\times10^{-4}$ & 1.57 & $1.56\times10^{-3}$ & 1.39 & $4.86\times10^{-3}$ & 1.20 \\
+& 128 & $1.49\times10^{-4}$ & 1.59 & $5.87\times10^{-4}$ & 1.41 & $2.08\times10^{-3}$ & 1.22 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{1.6}
+& \multicolumn{2}{c|}{1.4}
+& \multicolumn{2}{c}{1.2} \\
+
+\addlinespace
+\multirow{5}{*}{Stress}
+& 16  & $1.73\times10^{-2}$ & --   & $4.70\times10^{-2}$ & --   & $1.13\times10^{-1}$ & --   \\
+& 32  & $5.89\times10^{-3}$ & 1.55 & $1.81\times10^{-2}$ & 1.37 & $4.97\times10^{-2}$ & 1.19 \\
+& 64  & $1.99\times10^{-3}$ & 1.57 & $6.92\times10^{-3}$ & 1.39 & $2.16\times10^{-2}$ & 1.20 \\
+& 128 & $6.62\times10^{-4}$ & 1.59 & $2.61\times10^{-3}$ & 1.41 & $9.24\times10^{-3}$ & 1.22 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{1.6}
+& \multicolumn{2}{c|}{1.4}
+& \multicolumn{2}{c}{1.2} \\
+
+\addlinespace
+\multirow{5}{*}{Energy norm}
+& 16  & $1.73\times10^{-3}$ & --   & $4.70\times10^{-3}$ & --   & $1.13\times10^{-2}$ & --   \\
+& 32  & $5.89\times10^{-4}$ & 1.55 & $1.81\times10^{-3}$ & 1.37 & $4.97\times10^{-3}$ & 1.19 \\
+& 64  & $1.99\times10^{-4}$ & 1.57 & $6.92\times10^{-4}$ & 1.39 & $2.16\times10^{-3}$ & 1.20 \\
+& 128 & $6.62\times10^{-5}$ & 1.59 & $2.61\times10^{-4}$ & 1.41 & $9.24\times10^{-4}$ & 1.22 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{1.6}
+& \multicolumn{2}{c|}{1.4}
+& \multicolumn{2}{c}{1.2} \\
+
+\addlinespace
+\multirow{5}{*}{Pressure}
+& 16  & $1.12\times10^{-8}$  & --   & $3.01\times10^{-8}$ & --   & $7.31\times10^{-8}$ & --   \\
+& 32  & $3.80\times10^{-9}$  & 1.57 & $1.15\times10^{-8}$ & 1.39 & $3.18\times10^{-8}$ & 1.20 \\
+& 64  & $1.27\times10^{-9}$  & 1.58 & $4.35\times10^{-9}$ & 1.40 & $1.37\times10^{-8}$ & 1.21 \\
+& 128 & $4.22\times10^{-10}$ & 1.59 & $1.63\times10^{-9}$ & 1.41 & $5.85\times10^{-9}$ & 1.23 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{1.6}
+& \multicolumn{2}{c|}{1.4}
+& \multicolumn{2}{c}{1.2} \\
+
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+% =====================================================
+% EXAMPLE 4.2: WEAK REGULARITY
+% =====================================================
+
+\subsection{Example with weak temporal regularity}
+\label{sec:example2}
+
+The solution considered in Example~4.1 is smooth in time, which is a favourable setting for the uniform L1 scheme. We now consider a solution with reduced temporal regularity by adding a fractional power term to the velocity. With $\Omega$, $\nu$, $\boldsymbol{b}$, and $T$ unchanged, the prescribed solution is
+\begin{equation}
+\boldsymbol{u}(x,y,t)=\bigl(t^{2}+t^{\alpha}\bigr)
+\begin{pmatrix}
+\sin(\pi x)\cos(\pi y)\\[2pt]
+-\cos(\pi x)\sin(\pi y)
+\end{pmatrix},
+\qquad
+p(x,y,t)=t^{2}\sin(\pi x)\sin(\pi y).
+\end{equation}
+The term $t^\alpha$ is only H\"older-$\alpha$ regular at $t=0$ and introduces an initial singularity in the time derivatives of the velocity. Consequently, the temporal regularity assumptions used to obtain the $O(\tau^{2-\alpha})$ convergence rate for the uniform L1 scheme are no longer satisfied. 
+%Notice, however, that the pressure remains smooth in time.
+
+To account for the reduced temporal regularity, we also consider the graded temporal mesh
+\[
+t_n=T\left(\frac{n}{M}\right)^r,\qquad 0\leq n\leq M,
+\]
+where $r\geq1$ is the grading parameter. The choice $r=1$ corresponds to the uniform mesh, while
+\[
+r=\frac{2-\alpha}{\alpha}
+\]
+is used to compensate for the initial singularity and recover the optimal temporal convergence rate $O(M^{-(2-\alpha)})$.
+
+We first examine the spatial convergence using
+$N=4,8,16,32$ with $M=N^2$ and  $r=\frac{2-\alpha}{\alpha}$.
+The results for CIP and LPS are reported in Tables~\ref{tab:ex2-space-cip} and \ref{tab:ex2-space-lps}, respectively. As in the smooth example, the velocity $L^2$-error exhibits an observed convergence rate close to three, while the stress, energy-norm, and pressure errors converge with approximately second order. Thus, the reduced temporal regularity of the velocity does not affect the observed spatial convergence rates when the graded L1 scheme is used.
+
+We next investigate the temporal convergence. Table~\ref{tab:ex2-temporal-cip} presents the results obtained with the uniform L1 scheme. In contrast to the smooth case, the velocity, stress, and energy-norm errors no longer exhibit the $O(\tau^{2-\alpha})$ convergence rate. The observed orders vary with $\alpha$ and with the level of refinement, and a clear asymptotic convergence rate cannot be identified from the reported results. Nevertheless, the deterioration compared with the smooth example is evident and reflects the reduced temporal regularity introduced by the term $t^\alpha$. The pressure error behaves differently: its observed rates remain close to $2-\alpha$. The pressure error behaves differently: its observed rates remain close to $2-\alpha$, which is consistent with the fact that the prescribed pressure remains smooth in time and is therefore not affected by the initial singularity present in the velocity.
+
+Finally, Table~\ref{tab:ex2-temporal-graded-cip} presents the temporal errors obtained with the graded L1 scheme using
+$
+r=\frac{2-\alpha}{\alpha}.
+$
+The grading concentrates the time levels near $t=0$, where the velocity has reduced temporal regularity. The numerical results show that the convergence rates of the velocity, stress, and energy-norm errors approach the optimal rate
+\[
+O(M^{-(2-\alpha)}).
+\]
+In particular, the observed orders approach $1.6$, $1.4$, and $1.2$ for $\alpha=0.4$, $0.6$, and $0.8$, respectively. The pressure error exhibits the same temporal rates. These results demonstrate that the graded L1 scheme effectively compensates for the initial singularity and restores the optimal temporal convergence behaviour observed in the smooth case.
+
+
+
+% =====================================================
+% SPATIAL CONVERGENCE: GRADED L1/CIP
+% =====================================================
+\begin{table}[htbp]
+\centering
+\caption{Spatial $L^2$ errors and convergence orders for the graded L1/CIP method.}
+\label{tab:ex2-space-cip}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.1}
+\small
+\begin{tabular}{llcc|cc|cc}
+\toprule
+Quantity & $N_x\times N_y$
+& \multicolumn{2}{c|}{$\alpha=0.4$}
+& \multicolumn{2}{c|}{$\alpha=0.6$}
+& \multicolumn{2}{c}{$\alpha=0.8$} \\
+\cmidrule(lr){3-4}
+\cmidrule(lr){5-6}
+\cmidrule(l){7-8}
+& & $L^2$ error & Order
+& $L^2$ error & Order
+& $L^2$ error & Order \\
+\midrule
+
+Velocity & $4\times4$ & $4.29\times10^{-1}$ & -- & $4.26\times10^{-1}$ & -- & $4.21\times10^{-1}$ & -- \\
+& $8\times8$ & $5.63\times10^{-2}$ & 2.93 & $5.62\times10^{-2}$ & 2.92 & $5.60\times10^{-2}$ & 2.91 \\
+& $16\times16$ & $9.06\times10^{-3}$ & 2.64 & $9.05\times10^{-3}$ & 2.63 & $9.05\times10^{-3}$ & 2.63 \\
+& $32\times32$ & $1.41\times10^{-3}$ & 2.68 & $1.41\times10^{-3}$ & 2.68 & $1.42\times10^{-3}$ & 2.68 \\
+
+% \addlinespace
+% Velocity (max over $t$) & $4\times4$ & $4.29\times10^{-1}$ & -- & $4.26\times10^{-1}$ & -- & $4.21\times10^{-1}$ & -- \\
+% & $8\times8$ & $5.63\times10^{-2}$ & 2.93 & $5.62\times10^{-2}$ & 2.92 & $5.60\times10^{-2}$ & 2.91 \\
+% & $16\times16$ & $9.06\times10^{-3}$ & 2.64 & $9.05\times10^{-3}$ & 2.63 & $9.05\times10^{-3}$ & 2.63 \\
+% & $32\times32$ & $1.41\times10^{-3}$ & 2.68 & $1.41\times10^{-3}$ & 2.68 & $1.42\times10^{-3}$ & 2.68 \\
+
+\addlinespace
+Stress & $4\times4$ & $4.94\times10^{0}$ & -- & $4.90\times10^{0}$ & -- & $4.86\times10^{0}$ & -- \\
+& $8\times8$ & $1.65\times10^{0}$ & 1.58 & $1.65\times10^{0}$ & 1.57 & $1.64\times10^{0}$ & 1.56 \\
+& $16\times16$ & $5.65\times10^{-1}$ & 1.55 & $5.64\times10^{-1}$ & 1.55 & $5.63\times10^{-1}$ & 1.54 \\
+& $32\times32$ & $1.79\times10^{-1}$ & 1.66 & $1.79\times10^{-1}$ & 1.66 & $1.79\times10^{-1}$ & 1.66 \\
+
+% \addlinespace
+% Stress (max over $t$) & $4\times4$ & $4.94\times10^{0}$ & -- & $4.90\times10^{0}$ & -- & $4.86\times10^{0}$ & -- \\
+% & $8\times8$ & $1.65\times10^{0}$ & 1.58 & $1.65\times10^{0}$ & 1.57 & $1.64\times10^{0}$ & 1.56 \\
+% & $16\times16$ & $5.65\times10^{-1}$ & 1.55 & $5.64\times10^{-1}$ & 1.55 & $5.63\times10^{-1}$ & 1.54 \\
+% & $32\times32$ & $1.79\times10^{-1}$ & 1.66 & $1.79\times10^{-1}$ & 1.66 & $1.79\times10^{-1}$ & 1.66 \\
+
+\addlinespace
+Energy norm & $4\times4$ & $1.37\times10^{0}$ & -- & $1.36\times10^{0}$ & -- & $1.36\times10^{0}$ & -- \\
+& $8\times8$ & $3.73\times10^{-1}$ & 1.88 & $3.72\times10^{-1}$ & 1.87 & $3.72\times10^{-1}$ & 1.87 \\
+& $16\times16$ & $8.33\times10^{-2}$ & 2.16 & $8.32\times10^{-2}$ & 2.16 & $8.31\times10^{-2}$ & 2.16 \\
+& $32\times32$ & $1.69\times10^{-2}$ & 2.30 & $1.69\times10^{-2}$ & 2.30 & $1.69\times10^{-2}$ & 2.30 \\
+
+% \addlinespace
+% Energy norm (max over $t$) & $4\times4$ & $1.37\times10^{0}$ & -- & $1.36\times10^{0}$ & -- & $1.36\times10^{0}$ & -- \\
+% & $8\times8$ & $3.73\times10^{-1}$ & 1.88 & $3.72\times10^{-1}$ & 1.87 & $3.72\times10^{-1}$ & 1.87 \\
+% & $16\times16$ & $8.33\times10^{-2}$ & 2.16 & $8.32\times10^{-2}$ & 2.16 & $8.31\times10^{-2}$ & 2.16 \\
+% & $32\times32$ & $1.69\times10^{-2}$ & 2.30 & $1.69\times10^{-2}$ & 2.30 & $1.69\times10^{-2}$ & 2.30 \\
+
+\addlinespace
+Pressure & $4\times4$ & $3.31\times10^{-1}$ & -- & $3.31\times10^{-1}$ & -- & $3.31\times10^{-1}$ & -- \\
+& $8\times8$ & $5.93\times10^{-2}$ & 2.48 & $5.93\times10^{-2}$ & 2.48 & $5.93\times10^{-2}$ & 2.48 \\
+& $16\times16$ & $1.33\times10^{-2}$ & 2.15 & $1.33\times10^{-2}$ & 2.15 & $1.33\times10^{-2}$ & 2.15 \\
+& $32\times32$ & $3.24\times10^{-3}$ & 2.04 & $3.24\times10^{-3}$ & 2.04 & $3.24\times10^{-3}$ & 2.04 \\
+
+% \addlinespace
+% Pressure (max over $t$) & $4\times4$ & $3.31\times10^{-1}$ & -- & $3.31\times10^{-1}$ & -- & $3.31\times10^{-1}$ & -- \\
+% & $8\times8$ & $5.93\times10^{-2}$ & 2.48 & $5.93\times10^{-2}$ & 2.48 & $5.93\times10^{-2}$ & 2.48 \\
+% & $16\times16$ & $1.33\times10^{-2}$ & 2.15 & $1.33\times10^{-2}$ & 2.15 & $1.33\times10^{-2}$ & 2.15 \\
+% & $32\times32$ & $3.24\times10^{-3}$ & 2.04 & $3.24\times10^{-3}$ & 2.04 & $3.24\times10^{-3}$ & 2.04 \\
+
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+% =====================================================
+% SPATIAL CONVERGENCE: GRADED L1/LPS
+% =====================================================
+\begin{table}[htbp]
+\centering
+\caption{Spatial $L^2$ errors and convergence orders for the graded L1/LPS method with Taylor--Hood $P_2/P_1$ elements.}
+\label{tab:ex2-space-lps}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.1}
+\small
+\begin{tabular}{llcc|cc|cc}
+\toprule
+\multirow{2}{*}{Quantity} & \multirow{2}{*}{$N_x\times N_y$}
+& \multicolumn{2}{c|}{$\alpha=0.4$}
+& \multicolumn{2}{c|}{$\alpha=0.6$}
+& \multicolumn{2}{c}{$\alpha=0.8$} \\
+\cmidrule(lr){3-4}
+\cmidrule(lr){5-6}
+\cmidrule(l){7-8}
+& & $L^2$ error & Order
+& $L^2$ error & Order
+& $L^2$ error & Order \\
+\midrule
+
+\multirow{5}{*}{Velocity}
+& $4\times4$   & $4.29\times10^{-1}$ & --
+               & $4.26\times10^{-1}$ & --
+               & $4.21\times10^{-1}$ & -- \\
+& $8\times8$   & $5.63\times10^{-2}$ & 2.93
+               & $5.62\times10^{-2}$ & 2.92
+               & $5.60\times10^{-2}$ & 2.91 \\
+& $16\times16$ & $9.06\times10^{-3}$ & 2.64
+               & $9.05\times10^{-3}$ & 2.63
+               & $9.05\times10^{-3}$ & 2.63 \\
+& $32\times32$ & $1.41\times10^{-3}$ & 2.68
+               & $1.41\times10^{-3}$ & 2.68
+               & $1.42\times10^{-3}$ & 2.68 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{3}
+& \multicolumn{2}{c|}{3}
+& \multicolumn{2}{c}{3} \\
+
+% \addlinespace
+% \multirow{5}{*}{Velocity (max over $t$)}
+% & $4\times4$   & $4.29\times10^{-1}$ & --   & 0.11
+%                & $4.26\times10^{-1}$ & --   & 0.02
+%                & $4.21\times10^{-1}$ & --   & 0.18 \\
+% & $8\times8$   & $5.63\times10^{-2}$ & 2.93 & 1.46
+%                & $5.62\times10^{-2}$ & 2.92 & 1.10
+%                & $5.60\times10^{-2}$ & 2.91 & 1.41 \\
+% & $16\times16$ & $9.06\times10^{-3}$ & 2.64 & 71.34
+%                & $9.05\times10^{-3}$ & 2.63 & 82.95
+%                & $9.05\times10^{-3}$ & 2.63 & 80.58 \\
+% & $32\times32$ & $1.41\times10^{-3}$ & 2.68 & 14966.48
+%                & $1.41\times10^{-3}$ & 2.68 & 10181.49
+%                & $1.42\times10^{-3}$ & 2.68 & 9770.31 \\
+% & \textit{Theoret. order}
+% & \multicolumn{3}{c|}{3}
+% & \multicolumn{3}{c|}{3}
+% & \multicolumn{3}{c}{3} \\
+
+\addlinespace
+\multirow{5}{*}{Stress}
+& $4\times4$   & $4.94\times10^{0}$  & --
+               & $4.90\times10^{0}$  & --
+               & $4.86\times10^{0}$  & -- \\
+& $8\times8$   & $1.65\times10^{0}$  & 1.58
+               & $1.65\times10^{0}$  & 1.57
+               & $1.64\times10^{0}$  & 1.56 \\
+& $16\times16$ & $5.65\times10^{-1}$ & 1.55
+               & $5.64\times10^{-1}$ & 1.55
+               & $5.63\times10^{-1}$ & 1.54 \\
+& $32\times32$ & $1.79\times10^{-1}$ & 1.66
+               & $1.79\times10^{-1}$ & 1.66
+               & $1.79\times10^{-1}$ & 1.66 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c}{2} \\
+
+% \addlinespace
+% \multirow{5}{*}{Stress (max over $t$)}
+% & $4\times4$   & $4.94\times10^{0}$  & --   & 0.11
+%                & $4.90\times10^{0}$  & --   & 0.02
+%                & $4.86\times10^{0}$  & --   & 0.18 \\
+% & $8\times8$   & $1.65\times10^{0}$  & 1.58 & 1.46
+%                & $1.65\times10^{0}$  & 1.57 & 1.10
+%                & $1.64\times10^{0}$  & 1.56 & 1.41 \\
+% & $16\times16$ & $5.65\times10^{-1}$ & 1.55 & 71.34
+%                & $5.64\times10^{-1}$ & 1.55 & 82.95
+%                & $5.63\times10^{-1}$ & 1.54 & 80.58 \\
+% & $32\times32$ & $1.79\times10^{-1}$ & 1.66 & 14966.48
+%                & $1.79\times10^{-1}$ & 1.66 & 10181.49
+%                & $1.79\times10^{-1}$ & 1.66 & 9770.31 \\
+% & \textit{Theoret. order}
+% & \multicolumn{3}{c|}{2}
+% & \multicolumn{3}{c|}{2}
+% & \multicolumn{3}{c}{2} \\
+
+\addlinespace
+\multirow{5}{*}{Energy norm}
+& $4\times4$   & $1.37\times10^{0}$  & --
+               & $1.36\times10^{0}$  & --
+               & $1.36\times10^{0}$  & -- \\
+& $8\times8$   & $3.73\times10^{-1}$ & 1.88
+               & $3.72\times10^{-1}$ & 1.87
+               & $3.72\times10^{-1}$ & 1.87 \\
+& $16\times16$ & $8.33\times10^{-2}$ & 2.16
+               & $8.32\times10^{-2}$ & 2.16
+               & $8.31\times10^{-2}$ & 2.16 \\
+& $32\times32$ & $1.69\times10^{-2}$ & 2.30
+               & $1.69\times10^{-2}$ & 2.30
+               & $1.69\times10^{-2}$ & 2.30 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c}{2} \\
+
+% \addlinespace
+% \multirow{5}{*}{Energy norm (max over $t$)}
+% & $4\times4$   & $1.37\times10^{0}$  & --   & 0.11
+%                & $1.36\times10^{0}$  & --   & 0.02
+%                & $1.36\times10^{0}$  & --   & 0.18 \\
+% & $8\times8$   & $3.73\times10^{-1}$ & 1.88 & 1.46
+%                & $3.72\times10^{-1}$ & 1.87 & 1.10
+%                & $3.72\times10^{-1}$ & 1.87 & 1.41 \\
+% & $16\times16$ & $8.33\times10^{-2}$ & 2.16 & 71.34
+%                & $8.32\times10^{-2}$ & 2.16 & 82.95
+%                & $8.31\times10^{-2}$ & 2.16 & 80.58 \\
+% & $32\times32$ & $1.69\times10^{-2}$ & 2.30 & 14966.48
+%                & $1.69\times10^{-2}$ & 2.30 & 10181.49
+%                & $1.69\times10^{-2}$ & 2.30 & 9770.31 \\
+% & \textit{Theoret. order}
+% & \multicolumn{3}{c|}{2}
+% & \multicolumn{3}{c|}{2}
+% & \multicolumn{3}{c}{2} \\
+
+\addlinespace
+\multirow{5}{*}{Pressure}
+& $4\times4$   & $3.31\times10^{-1}$ & --
+               & $3.31\times10^{-1}$ & --
+               & $3.31\times10^{-1}$ & -- \\
+& $8\times8$   & $5.93\times10^{-2}$ & 2.48
+               & $5.93\times10^{-2}$ & 2.48
+               & $5.93\times10^{-2}$ & 2.48 \\
+& $16\times16$ & $1.33\times10^{-2}$ & 2.15
+               & $1.33\times10^{-2}$ & 2.15
+               & $1.33\times10^{-2}$ & 2.15 \\
+& $32\times32$ & $3.24\times10^{-3}$ & 2.04
+               & $3.24\times10^{-3}$ & 2.04
+               & $3.24\times10^{-3}$ & 2.04 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c|}{2}
+& \multicolumn{2}{c}{2} \\
+
+% \addlinespace
+% \multirow{5}{*}{Pressure (max over $t$)}
+% & $4\times4$   & $3.31\times10^{-1}$ & --   & 0.11
+%                & $3.31\times10^{-1}$ & --   & 0.02
+%                & $3.31\times10^{-1}$ & --   & 0.18 \\
+% & $8\times8$   & $5.93\times10^{-2}$ & 2.48 & 1.46
+%                & $5.93\times10^{-2}$ & 2.48 & 1.10
+%                & $5.93\times10^{-2}$ & 2.48 & 1.41 \\
+% & $16\times16$ & $1.33\times10^{-2}$ & 2.15 & 71.34
+%                & $1.33\times10^{-2}$ & 2.15 & 82.95
+%                & $1.33\times10^{-2}$ & 2.15 & 80.58 \\
+% & $32\times32$ & $3.24\times10^{-3}$ & 2.04 & 14966.48
+%                & $3.24\times10^{-3}$ & 2.04 & 10181.49
+%                & $3.24\times10^{-3}$ & 2.04 & 9770.31 \\
+% & \textit{Theoret. order}
+% & \multicolumn{3}{c|}{2}
+% & \multicolumn{3}{c|}{2}
+% & \multicolumn{3}{c}{2} \\
+
+\bottomrule
+\end{tabular}
+\end{table}
+% =====================================================
+% TEMPORAL CONVERGENCE: UNIFORM L1/CIP, WEAK REGULARITY
+% =====================================================
+\begin{table}[htbp]
+\centering
+\caption{Temporal $L^2$ errors and convergence orders for the graded L1/CIP
+method with Taylor--Hood $P_2/P_1$ elements.}
+\label{tab:ex2-temporal-graded-cip}
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.15}
+\small
+\begin{tabular}{llcc|cc|cc}
+\toprule
+\multirow{2}{*}{Quantity} & \multirow{2}{*}{$M$}
+& \multicolumn{2}{c|}{$\alpha=0.4$}
+& \multicolumn{2}{c|}{$\alpha=0.6$}
+& \multicolumn{2}{c}{$\alpha=0.8$} \\
+\cmidrule(lr){3-4}
+\cmidrule(lr){5-6}
+\cmidrule(l){7-8}
+& & $L^2$ error & Order
+  & $L^2$ error & Order
+  & $L^2$ error & Order \\
+\midrule
+
+% \multirow{6}{*}{Velocity}
+% & 4  & $1.67\times10^{-2}$ & --   & $1.53\times10^{-2}$ & --   & $9.22\times10^{-2}$ & --   \\
+% & 8  & $1.29\times10^{-2}$ & 0.38 & $5.02\times10^{-3}$ & 1.60 & $3.57\times10^{-2}$ & 1.37 \\
+% & 16 & $8.11\times10^{-3}$ & 0.67 & $5.42\times10^{-3}$ & -0.11 & $1.29\times10^{-2}$ & 1.47 \\
+% & 32 & $4.61\times10^{-3}$ & 0.82 & $4.03\times10^{-3}$ & 0.43 & $4.25\times10^{-3}$ & 1.60 \\
+% & 64 & $2.44\times10^{-3}$ & 0.92 & $2.47\times10^{-3}$ & 0.70 & $1.24\times10^{-3}$ & 1.78 \\
+% & \textit{Theoret. order}
+% & \multicolumn{2}{c|}{?}
+% & \multicolumn{2}{c|}{?}
+% & \multicolumn{2}{c}{?} \\
+
+\addlinespace
+\multirow{6}{*}{Velocity (max over $t$)}
+& 4  & $1.07\times10^{-1}$ & --   & $6.73\times10^{-2}$ & --   & $9.22\times10^{-2}$ & --   \\
+& 8  & $9.15\times10^{-2}$ & 0.23 & $5.91\times10^{-2}$ & 0.19 & $3.57\times10^{-2}$ & 1.37 \\
+& 16 & $7.35\times10^{-2}$ & 0.32 & $4.46\times10^{-2}$ & 0.40 & $1.66\times10^{-2}$ & 1.10 \\
+& 32 & $5.80\times10^{-2}$ & 0.34 & $3.15\times10^{-2}$ & 0.50 & $1.09\times10^{-2}$ & 0.61 \\
+& 64 & $4.50\times10^{-2}$ & 0.37 & $2.10\times10^{-2}$ & 0.59 & $6.69\times10^{-3}$ & 0.71 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{0.4}
+& \multicolumn{2}{c|}{0.6}
+& \multicolumn{2}{c}{0.8} \\
+
+% \addlinespace
+% \multirow{6}{*}{Stress}
+% & 4  & $7.45\times10^{-2}$ & --   & $6.83\times10^{-2}$ & --   & $4.10\times10^{-1}$ & --   \\
+% & 8  & $5.72\times10^{-2}$ & 0.38 & $2.25\times10^{-2}$ & 1.60 & $1.59\times10^{-1}$ & 1.37 \\
+% & 16 & $3.60\times10^{-2}$ & 0.67 & $2.41\times10^{-2}$ & -0.10 & $5.73\times10^{-2}$ & 1.47 \\
+% & 32 & $2.05\times10^{-2}$ & 0.82 & $1.79\times10^{-2}$ & 0.43 & $1.89\times10^{-2}$ & 1.60 \\
+% & 64 & $1.08\times10^{-2}$ & 0.92 & $1.10\times10^{-2}$ & 0.70 & $5.52\times10^{-3}$ & 1.78 \\
+% & \textit{Theoret. order}
+% & \multicolumn{2}{c|}{??}
+% & \multicolumn{2}{c|}{??}
+% & \multicolumn{2}{c}{??} \\
+
+\addlinespace
+\multirow{6}{*}{Stress (max over $t$)}
+& 4  & $4.77\times10^{-1}$ & --   & $3.00\times10^{-1}$ & --   & $4.10\times10^{-1}$ & --   \\
+& 8  & $4.08\times10^{-1}$ & 0.23 & $2.63\times10^{-1}$ & 0.19 & $1.59\times10^{-1}$ & 1.37 \\
+& 16 & $3.28\times10^{-1}$ & 0.31 & $1.99\times10^{-1}$ & 0.40 & $7.42\times10^{-2}$ & 1.10 \\
+& 32 & $2.59\times10^{-1}$ & 0.34 & $1.41\times10^{-1}$ & 0.50 & $4.88\times10^{-2}$ & 0.60 \\
+& 64 & $2.01\times10^{-1}$ & 0.37 & $9.39\times10^{-2}$ & 0.59 & $2.99\times10^{-2}$ & 0.71 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{0.4}
+& \multicolumn{2}{c|}{0.6}
+& \multicolumn{2}{c}{0.8} \\
+
+% \addlinespace
+% \multirow{6}{*}{Energy norm}
+% & 4  & $9.99\times10^{-4}$ & --   & $2.14\times10^{-3}$ & --   & $6.02\times10^{-3}$ & --   \\
+% & 8  & $6.17\times10^{-4}$ & 0.69 & $8.25\times10^{-4}$ & 1.38 & $2.48\times10^{-3}$ & 1.28 \\
+% & 16 & $3.70\times10^{-4}$ & 0.74 & $3.93\times10^{-4}$ & 1.07 & $9.59\times10^{-4}$ & 1.37 \\
+% & 32 & $2.07\times10^{-4}$ & 0.84 & $2.16\times10^{-4}$ & 0.86 & $3.72\times10^{-4}$ & 1.36 \\
+% & 64 & $1.09\times10^{-4}$ & 0.92 & $1.19\times10^{-4}$ & 0.86 & $1.51\times10^{-4}$ & 1.30 \\
+% & \textit{Theoret. order}
+% & \multicolumn{2}{c|}{??}
+% & \multicolumn{2}{c|}{??}
+% & \multicolumn{2}{c}{??} \\
+
+\addlinespace
+\multirow{6}{*}{Energy norm (max over $t$)}
+& 4  & $7.79\times10^{-3}$ & --   & $5.67\times10^{-3}$ & --   & $6.02\times10^{-3}$ & --   \\
+& 8  & $7.72\times10^{-3}$ & 0.01 & $6.14\times10^{-3}$ & -0.12 & $2.48\times10^{-3}$ & 1.28 \\
+& 16 & $7.19\times10^{-3}$ & 0.10 & $5.42\times10^{-3}$ & 0.18 & $2.21\times10^{-3}$ & 0.17 \\
+& 32 & $6.46\times10^{-3}$ & 0.15 & $4.20\times10^{-3}$ & 0.37 & $1.57\times10^{-3}$ & 0.49 \\
+& 64 & $5.55\times10^{-3}$ & 0.22 & $2.93\times10^{-3}$ & 0.52 & $1.03\times10^{-3}$ & 0.61 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{0.4}
+& \multicolumn{2}{c|}{0.6}
+& \multicolumn{2}{c}{0.8} \\
+
+% \addlinespace
+% \multirow{6}{*}{Pressure}
+% & 4  & $3.79\times10^{-6}$ & --   & $8.06\times10^{-6}$ & --   & $1.53\times10^{-5}$ & --   \\
+% & 8  & $1.31\times10^{-6}$ & 1.53 & $3.12\times10^{-6}$ & 1.37 & $6.68\times10^{-6}$ & 1.19 \\
+% & 16 & $4.47\times10^{-7}$ & 1.55 & $1.20\times10^{-6}$ & 1.38 & $2.91\times10^{-6}$ & 1.20 \\
+% & 32 & $1.51\times10^{-7}$ & 1.57 & $4.55\times10^{-7}$ & 1.39 & $1.26\times10^{-6}$ & 1.21 \\
+% & 64 & $5.02\times10^{-8}$ & 1.59 & $1.71\times10^{-7}$ & 1.41 & $5.36\times10^{-7}$ & 1.23 \\
+% & \textit{Theoret. order}
+% & \multicolumn{2}{c|}{??}
+% & \multicolumn{2}{c|}{??}
+% & \multicolumn{2}{c}{??} \\
+
+\addlinespace
+\multirow{6}{*}{Pressure (max over $t$)}
+& 4  & $3.79\times10^{-6}$ & --   & $8.06\times10^{-6}$ & --   & $1.53\times10^{-5}$ & --   \\
+& 8  & $1.31\times10^{-6}$ & 1.53 & $3.12\times10^{-6}$ & 1.37 & $6.68\times10^{-6}$ & 1.19 \\
+& 16 & $4.47\times10^{-7}$ & 1.55 & $1.20\times10^{-6}$ & 1.38 & $2.91\times10^{-6}$ & 1.20 \\
+& 32 & $1.51\times10^{-7}$ & 1.57 & $4.55\times10^{-7}$ & 1.39 & $1.26\times10^{-6}$ & 1.21 \\
+& 64 & $5.02\times10^{-8}$ & 1.59 & $1.71\times10^{-7}$ & 1.41 & $5.36\times10^{-7}$ & 1.23 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{??}
+& \multicolumn{2}{c|}{??}
+& \multicolumn{2}{c}{??} \\
+
+\bottomrule
+\end{tabular}
+\end{table}
+% =====================================================
+% TEMPORAL CONVERGENCE: GRADED L1/CIP, WEAK REGULARITY
+% =====================================================
+\begin{table}[htbp]
+\centering
+\caption{Temporal $L^2$ errors and convergence orders for the graded L1/CIP
+method with Taylor--Hood $P_2/P_1$ elements.}
+\label{tab:ex2-temporal-graded-cip}
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.15}
+\small
+\begin{tabular}{llcc|cc|cc}
+\toprule
+\multirow{2}{*}{Quantity} & \multirow{2}{*}{$M$}
+& \multicolumn{2}{c|}{$\alpha=0.4$}
+& \multicolumn{2}{c|}{$\alpha=0.6$}
+& \multicolumn{2}{c}{$\alpha=0.8$} \\
+\cmidrule(lr){3-4}
+\cmidrule(lr){5-6}
+\cmidrule(l){7-8}
+& & $L^2$ error & Order
+  & $L^2$ error & Order
+  & $L^2$ error & Order \\
+\midrule
+
+% \multirow{6}{*}{Velocity}
+% & 4  & $7.55\times10^{-2}$ & --   & $8.50\times10^{-2}$ & --   & $1.24\times10^{-1}$ & --   \\
+% & 8  & $3.76\times10^{-2}$ & 1.01 & $3.74\times10^{-2}$ & 1.18 & $5.44\times10^{-2}$ & 1.18 \\
+% & 16 & $1.58\times10^{-2}$ & 1.26 & $1.56\times10^{-2}$ & 1.26 & $2.34\times10^{-2}$ & 1.21 \\
+% & 32 & $6.02\times10^{-3}$ & 1.39 & $6.29\times10^{-3}$ & 1.31 & $9.98\times10^{-3}$ & 1.23 \\
+% & 64 & $2.17\times10^{-3}$ & 1.47 & $2.45\times10^{-3}$ & 1.36 & $4.20\times10^{-3}$ & 1.25 \\
+% & \textit{Theoret. order}
+% & \multicolumn{2}{c|}{1.6}
+% & \multicolumn{2}{c|}{1.4}
+% & \multicolumn{2}{c}{1.2} \\
+
+\addlinespace
+\multirow{6}{*}{Velocity (max over $t$)}
+& 4  & $7.55\times10^{-2}$ & --   & $8.50\times10^{-2}$ & --   & $1.24\times10^{-1}$ & --   \\
+& 8  & $3.76\times10^{-2}$ & 1.01 & $3.74\times10^{-2}$ & 1.18 & $5.44\times10^{-2}$ & 1.18 \\
+& 16 & $1.58\times10^{-2}$ & 1.26 & $1.56\times10^{-2}$ & 1.26 & $2.34\times10^{-2}$ & 1.21 \\
+& 32 & $6.02\times10^{-3}$ & 1.39 & $6.29\times10^{-3}$ & 1.31 & $9.98\times10^{-3}$ & 1.23 \\
+& 64 & $2.17\times10^{-3}$ & 1.47 & $2.45\times10^{-3}$ & 1.36 & $4.20\times10^{-3}$ & 1.25 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{1.6}
+& \multicolumn{2}{c|}{1.4}
+& \multicolumn{2}{c}{1.2} \\
+
+% \addlinespace
+% \multirow{6}{*}{Stress}
+% & 4  & $3.36\times10^{-1}$ & --   & $3.78\times10^{-1}$ & --   & $5.49\times10^{-1}$ & --   \\
+% & 8  & $1.67\times10^{-1}$ & 1.01 & $1.66\times10^{-1}$ & 1.18 & $2.42\times10^{-1}$ & 1.18 \\
+% & 16 & $7.01\times10^{-2}$ & 1.26 & $6.95\times10^{-2}$ & 1.26 & $1.04\times10^{-1}$ & 1.21 \\
+% & 32 & $2.68\times10^{-2}$ & 1.39 & $2.80\times10^{-2}$ & 1.31 & $4.44\times10^{-2}$ & 1.23 \\
+% & 64 & $9.65\times10^{-3}$ & 1.47 & $1.09\times10^{-2}$ & 1.36 & $1.87\times10^{-2}$ & 1.25 \\
+% & \textit{Theoret. order}
+% & \multicolumn{2}{c|}{1.6}
+% & \multicolumn{2}{c|}{1.4}
+% & \multicolumn{2}{c}{1.2} \\
+
+\addlinespace
+\multirow{6}{*}{Stress (max over $t$)}
+& 4  & $3.36\times10^{-1}$ & --   & $3.78\times10^{-1}$ & --   & $5.49\times10^{-1}$ & --   \\
+& 8  & $1.67\times10^{-1}$ & 1.01 & $1.66\times10^{-1}$ & 1.18 & $2.42\times10^{-1}$ & 1.18 \\
+& 16 & $7.01\times10^{-2}$ & 1.26 & $6.95\times10^{-2}$ & 1.26 & $1.04\times10^{-1}$ & 1.21 \\
+& 32 & $2.68\times10^{-2}$ & 1.39 & $2.80\times10^{-2}$ & 1.31 & $4.44\times10^{-2}$ & 1.23 \\
+& 64 & $9.65\times10^{-3}$ & 1.47 & $1.09\times10^{-2}$ & 1.36 & $1.87\times10^{-2}$ & 1.25 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{1.6}
+& \multicolumn{2}{c|}{1.4}
+& \multicolumn{2}{c}{1.2} \\
+
+% \addlinespace
+% \multirow{6}{*}{Energy norm}
+% & 4  & $4.95\times10^{-3}$ & --   & $6.08\times10^{-3}$ & --   & $8.38\times10^{-3}$ & --   \\
+% & 8  & $2.47\times10^{-3}$ & 1.00 & $2.74\times10^{-3}$ & 1.15 & $3.79\times10^{-3}$ & 1.14 \\
+% & 16 & $1.03\times10^{-3}$ & 1.26 & $1.15\times10^{-3}$ & 1.26 & $1.64\times10^{-3}$ & 1.21 \\
+% & 32 & $3.91\times10^{-4}$ & 1.40 & $4.59\times10^{-4}$ & 1.32 & $7.05\times10^{-4}$ & 1.22 \\
+% & 64 & $1.40\times10^{-4}$ & 1.48 & $1.78\times10^{-4}$ & 1.36 & $3.02\times10^{-4}$ & 1.22 \\
+% & \textit{Theoret. order}
+% & \multicolumn{2}{c|}{1.6}
+% & \multicolumn{2}{c|}{1.4}
+% & \multicolumn{2}{c}{1.2} \\
+
+\addlinespace
+\multirow{6}{*}{Energy norm (max over $t$)}
+& 4  & $4.95\times10^{-3}$ & --   & $6.08\times10^{-3}$ & --   & $8.38\times10^{-3}$ & --   \\
+& 8  & $2.47\times10^{-3}$ & 1.00 & $2.76\times10^{-3}$ & 1.14 & $3.79\times10^{-3}$ & 1.14 \\
+& 16 & $1.03\times10^{-3}$ & 1.26 & $1.37\times10^{-3}$ & 1.00 & $1.64\times10^{-3}$ & 1.21 \\
+& 32 & $3.91\times10^{-4}$ & 1.40 & $6.10\times10^{-4}$ & 1.17 & $7.05\times10^{-4}$ & 1.22 \\
+& 64 & $1.40\times10^{-4}$ & 1.48 & $2.50\times10^{-4}$ & 1.28 & $3.45\times10^{-4}$ & 1.03 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{1.6}
+& \multicolumn{2}{c|}{1.4}
+& \multicolumn{2}{c}{1.2} \\
+
+% \addlinespace
+% \multirow{6}{*}{Pressure}
+% & 4  & $1.63\times10^{-5}$ & --   & $1.92\times10^{-5}$ & --   & $2.24\times10^{-5}$ & --   \\
+% & 8  & $7.50\times10^{-6}$ & 1.12 & $8.48\times10^{-6}$ & 1.18 & $1.03\times10^{-5}$ & 1.13 \\
+% & 16 & $3.01\times10^{-6}$ & 1.32 & $3.49\times10^{-6}$ & 1.28 & $4.58\times10^{-6}$ & 1.17 \\
+% & 32 & $1.12\times10^{-6}$ & 1.43 & $1.38\times10^{-6}$ & 1.33 & $2.01\times10^{-6}$ & 1.19 \\
+% & 64 & $3.96\times10^{-7}$ & 1.50 & $5.34\times10^{-7}$ & 1.37 & $8.62\times10^{-7}$ & 1.22 \\
+% & \textit{Theoret. order}
+% & \multicolumn{2}{c|}{1.6}
+% & \multicolumn{2}{c|}{1.4}
+% & \multicolumn{2}{c}{1.2} \\
+
+\addlinespace
+\multirow{6}{*}{Pressure (max over $t$)}
+& 4  & $1.63\times10^{-5}$ & --   & $1.92\times10^{-5}$ & --   & $2.24\times10^{-5}$ & --   \\
+& 8  & $7.50\times10^{-6}$ & 1.12 & $8.48\times10^{-6}$ & 1.18 & $1.03\times10^{-5}$ & 1.13 \\
+& 16 & $3.01\times10^{-6}$ & 1.32 & $3.49\times10^{-6}$ & 1.28 & $4.58\times10^{-6}$ & 1.17 \\
+& 32 & $1.12\times10^{-6}$ & 1.43 & $1.38\times10^{-6}$ & 1.33 & $2.01\times10^{-6}$ & 1.19 \\
+& 64 & $3.96\times10^{-7}$ & 1.50 & $5.34\times10^{-7}$ & 1.37 & $8.62\times10^{-7}$ & 1.22 \\
+& \textit{Theoret. order}
+& \multicolumn{2}{c|}{1.6}
+& \multicolumn{2}{c|}{1.4}
+& \multicolumn{2}{c}{1.2} \\
+
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =====================================================
+% =====================================================================
+\begin{thebibliography}{99}
+\bibitem{AKJ} N.~Ahmed, S.~Karaa, A.~Jha, Symmetric stabilized FEM for time-fractional convection--diffusion--reaction equations, \emph{Math.\ Comput.\ Simulation} \textbf{245} (2026), 685--697.
+\bibitem{Ali} A.~A.~Alikhanov, A priori estimates for solutions of boundary value problems for fractional-order equations, \emph{Differ.\ Equ.} \textbf{46} (2010), 660--666.
+\bibitem{BBF} D.~Boffi, F.~Brezzi, M.~Fortin, \emph{Mixed Finite Element Methods and Applications}, Springer, Berlin, 2013.
+{\color{blue}
+\bibitem{Baz01} E.~Bazhlekova, \emph{Fractional Evolution Equations in Banach Spaces}, PhD thesis, Eindhoven University of Technology, 2001.
+\bibitem{BF07} E.~Burman, M.~A.~Fern\'andez, Continuous interior penalty finite element method for the time-dependent Navier--Stokes equations: space discretization and convergence, \emph{Numer.\ Math.} \textbf{107} (2007), 39--77.
+\bibitem{Die10} K.~Diethelm, \emph{The Analysis of Fractional Differential Equations}, Lecture Notes in Math.\ 2004, Springer, Berlin, 2010.
+\bibitem{GS03} V.~Girault, L.~R.~Scott, A quasi-local interpolation operator preserving the discrete divergence, \emph{Calcolo} \textbf{40} (2003), 1--19.
+\bibitem{LL18} L.~Li, J.-G.~Liu, A generalized definition of Caputo derivatives and its application to fractional ODEs, \emph{SIAM J.\ Math.\ Anal.} \textbf{50} (2018), 2867--2900.
+\bibitem{YGD07} H.~Ye, J.~Gao, Y.~Ding, A generalized Gronwall inequality and its application to a fractional differential equation, \emph{J.\ Math.\ Anal.\ Appl.} \textbf{328} (2007), 1075--1081.
+}
+\bibitem{dFGJN} J.~de~Frutos, B.~Garc\'{\i}a-Archilla, V.~John, J.~Novo, Analysis of the grad-div stabilization for the time-dependent Navier--Stokes equations with inf-sup stable finite elements, \emph{Adv.\ Comput.\ Math.} \textbf{44} (2018), 195--225.
+\bibitem{Kal} T.~Kaluza, \"Uber die Koeffizienten reziproker Potenzreihen, \emph{Math.\ Z.} \textbf{28} (1928), 161--170.
+\bibitem{LX} Y.~Lin, C.~Xu, Finite difference/spectral approximations for the time-fractional diffusion equation, \emph{J.\ Comput.\ Phys.} \textbf{225} (2007), 1533--1552.
+\bibitem{Lin} A.~Linke, On the role of the Helmholtz decomposition in mixed methods for incompressible flows and a new variational crime, \emph{Comput.\ Methods Appl.\ Mech.\ Engrg.} \textbf{268} (2014), 782--800.
+\end{thebibliography}
+
+% =====================================================================
+\appendix
+\section{Proof of the consistency estimate for the L1 scheme}\label{app:cons}
+\begin{proof}[Proof of \eqref{lem:cons}]
+Write $M_2=\max_{t\in[0,T]}\|\partial_t^2\bm u(t)\|_X$ and $\bm u^k=\bm u(t_k)$.
+
+Since $\bm u\in C^1([0,T];X)$, splitting the integral in \eqref{eq:caputo} at the nodes gives
+\[
+\CD\bm u(t_n)=\frac1{\Gamma(1-\alpha)}\sum_{k=1}^n\int_{t_{k-1}}^{t_k}(t_n-s)^{-\alpha}\,\bm u'(s)\,ds .
+\]
+For the L1 approximation, we use
+\[
+\int_{t_{k-1}}^{t_k}(t_n-s)^{-\alpha}\,ds=\frac{(t_n-t_{k-1})^{1-\alpha}-(t_n-t_k)^{1-\alpha}}{1-\alpha}=\frac{\tau^{1-\alpha}\bigl((n-k+1)^{1-\alpha}-(n-k)^{1-\alpha}\bigr)}{1-\alpha},
+\]
+together with $\Gamma(2-\alpha)=(1-\alpha)\Gamma(1-\alpha)$, which shows
+\[
+\tau^{-\alpha}\beta_{n-k}\,(\bm u^k-\bm u^{k-1})=\frac1{\Gamma(1-\alpha)}\,\frac{\bm u^k-\bm u^{k-1}}\tau\int_{t_{k-1}}^{t_k}(t_n-s)^{-\alpha}\,ds .
+\]
+Summing over $k$ and subtracting the two representations,
+\begin{equation}\label{eq:cons-integral}
+\mathcal R^n=-\frac1{\Gamma(1-\alpha)}\sum_{k=1}^n\int_{t_{k-1}}^{t_k}\varphi_n(s)\,\bm e_k(s)\,ds,
+\end{equation}
+with
+\[
+\varphi_n(s):=(t_n-s)^{-\alpha},\qquad \bm e_k(s):=\bm u'(s)-\frac{\bm u^k-\bm u^{k-1}}\tau .
+\]
+
+Since $(\bm u^k-\bm u^{k-1})/\tau=\tau^{-1}\int_{t_{k-1}}^{t_k}\bm u'(\theta)\,d\theta$,
+\begin{equation}\label{eq:cons-ek}
+\int_{t_{k-1}}^{t_k}\bm e_k(s)\,ds=0,\qquad
+\bm e_k(s)=\frac1\tau\int_{t_{k-1}}^{t_k}\bigl(\bm u'(s)-\bm u'(\theta)\bigr)\,d\theta,
+\end{equation}
+and, because $\|\bm u'(s)-\bm u'(\theta)\|_X\le M_2|s-\theta|\le M_2\tau$ for $s,\theta\in[t_{k-1},t_k]$, \eqref{eq:cons-ek} gives
+\begin{equation}\label{eq:cons-ek-bound}
+\|\bm e_k(s)\|_X\le M_2\tau .
+\end{equation}
+
+On the last interval $k=n$, $\varphi_n$ is singular at $s=t_n$ but integrable, and \eqref{eq:cons-ek-bound} gives
+\begin{equation}\label{eq:cons-last}
+\Bigl\|\int_{t_{n-1}}^{t_n}\varphi_n(s)\,\bm e_n(s)\,ds\Bigr\|_X\le M_2\tau\int_{t_{n-1}}^{t_n}(t_n-s)^{-\alpha}\,ds=\frac{M_2\,\tau^{2-\alpha}}{1-\alpha}.
+\end{equation}
+
+On the earlier intervals $k\le n-1$, $\varphi_n$ is smooth on $[t_{k-1},t_k]$ with $\varphi_n'(s)=\alpha(t_n-s)^{-\alpha-1}>0$, which is increasing, so
+\[
+\sup_{s\in[t_{k-1},t_k]}|\varphi_n'(s)|=\alpha\bigl((n-k)\tau\bigr)^{-\alpha-1}.
+\]
+By the first relation in \eqref{eq:cons-ek}, the constant $\varphi_n(t_k)$ can be subtracted:
+\[
+\int_{t_{k-1}}^{t_k}\varphi_n(s)\,\bm e_k(s)\,ds=\int_{t_{k-1}}^{t_k}\bigl(\varphi_n(s)-\varphi_n(t_k)\bigr)\,\bm e_k(s)\,ds .
+\]
+With $|\varphi_n(s)-\varphi_n(t_k)|\le\sup|\varphi_n'|\,(t_k-s)$, $\int_{t_{k-1}}^{t_k}(t_k-s)\,ds=\tau^2/2$ and \eqref{eq:cons-ek-bound},
+\begin{equation}\label{eq:cons-earlier}
+\Bigl\|\int_{t_{k-1}}^{t_k}\varphi_n\,\bm e_k\,ds\Bigr\|_X\le M_2\tau\cdot\alpha\bigl((n-k)\tau\bigr)^{-\alpha-1}\cdot\frac{\tau^2}2=\frac\alpha2\,M_2\,\tau^{2-\alpha}\,(n-k)^{-1-\alpha}.
+\end{equation}
+
+Since $\sum_{j=1}^{\infty}j^{-1-\alpha}\le1+\int_1^\infty x^{-1-\alpha}\,dx=1+\frac1\alpha$, summing \eqref{eq:cons-earlier} over $k=1,\dots,n-1$ gives
+\begin{equation}\label{eq:cons-sum}
+\sum_{k=1}^{n-1}\frac\alpha2\,M_2\tau^{2-\alpha}(n-k)^{-1-\alpha}\le\frac\alpha2\Bigl(1+\frac1\alpha\Bigr)M_2\tau^{2-\alpha}=\frac{1+\alpha}2\,M_2\,\tau^{2-\alpha}.
+\end{equation}
+Combining \eqref{eq:cons-integral} with the bounds \eqref{eq:cons-last} and \eqref{eq:cons-sum} for its $n$ summands, and multiplying by $1/\Gamma(1-\alpha)$,
+\[
+\|\mathcal R^n\|_X\le\frac1{\Gamma(1-\alpha)}\Bigl(\frac{1+\alpha}2+\frac1{1-\alpha}\Bigr)M_2\,\tau^{2-\alpha}=C_\alpha M_2\,\tau^{2-\alpha}. \qedhere
+\]
+\end{proof}
+
+
+\begin{remark}
+The proof uses $\bm u\in C^2([0,T];X)$ up to $t=0$. If $\partial_t^2\bm u$ is unbounded near $t=0$ (initial fractional singularity), the first intervals contribute a larger error and weighted or graded-mesh consistency bounds must replace \eqref{lem:cons}.
+\end{remark}
+
+
+\end{document}

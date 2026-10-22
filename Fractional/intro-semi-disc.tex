@@ -1,0 +1,35 @@
+We study the time-fractional Oseen equations and seek a velocity $\bm u=(u_1,u_2)^\top$ and pressure $p$ satisfying, for $(x,t)\in\Omega\times(0,T]$,
+\begin{equation}\label{eq:pde}
+\begin{aligned}
+\CD\bm u-\nu\Delta\bm u+(\bmb\cdot\nabla)\bm u+\mu\bm u+\nabla p&=\bm f, \qquad 0<\alpha<1,\quad \nu>0,\quad \mu\ge0,\
+\nabla!\cdot\bm u&=0,\
+\bm u(\cdot,0)&=\bm u_0,
+\end{aligned}
+\end{equation}
+where $\Omega$ is a bounded polygon, and the Caputo derivative of order $\alpha$ is defined by
+\begin{equation}\label{eq:caputo}
+\CD\bm u(x,t)=\frac{1}{\Gamma(1-\alpha)}\int_0^t(t-s)^{-\alpha},\partial_s\bm u(x,s),ds .
+\end{equation}
+We impose homogeneous Dirichlet conditions on the velocity, $\bm u=0$ on $\partial\Omega$, and normalise the pressure by $\int_\Omega p,dx=0$. When $\mu=0$, the \eqref{eq:pde} is the classical Oseen problem with a Caputo time derivative.
+
+Two features shape the numerical analysis. When $\nu$ is small, convection can dominate diffusion, so stabilisation is needed to obtain estimates that stay robust with respect to viscosity. The Caputo derivative is nonlocal, and the solution may have limited temporal regularity near $t=0$; in particular, its time derivative can behave like $t^{\alpha-1}$. For this reason, standard arguments that require $\partial_t\bm u\in L^2$ may not apply. We use inf–sup stable finite element pairs with grad-div stabilisation and one of four symmetric convection stabilisations: local projection (LPS), continuous interior penalty (CIP), orthogonal subscale (OSS), or subgrid scale (SGS). Time is discretised with the L1 scheme.
+
+For the error analysis, we compare the discrete velocity with a divergence-preserving Fortin interpolant rather than a Stokes projection. A fractional energy argument controls the $L^2$ error, while grad-div stabilisation controls the pressure–divergence coupling. Viscosity-robust estimates of this kind are available for integer-order problems, including CIP \cite{BF07} and grad-div stabilisation \cite{dFGJN}. Here we extend that approach to the Caputo setting under regularity assumptions that accommodate the initial-time singularity.
+
+\paragraph{Notation.}
+The symbols $|\cdot|$ and $(\cdot,\cdot)$ denote the $L^2(\Omega)$ norm and inner product, respectively, applied componentwise to vector fields. The advection field satisfies $\bmb\in[W^{1,\infty}(\Omega)]^2$ and is divergence-free:
+\[
+\nabla!\cdot\bmb=0 .
+\]
+The Friedrichs constant $C_F$ satisfies
+\[
+|\bm v|\le C_F|\nabla\bm v|\qquad\text{for all }\bm v\in[H^1_0(\Omega)]^2 .
+\]
+We write the Riemann–Liouville integral as
+\[
+\RL g(t)=\frac1{\Gamma(\alpha)}\int_0^t(t-s)^{\alpha-1}g(s),ds .
+\]
+Throughout, $C$ denotes a generic constant with no negative powers of $\nu$; any other dependencies are stated where relevant.
+
+\paragraph{Outline.}
+\Cref{sec:space} develops the spatial discretisation and its stabilisations, then analyses the semi-discrete problem. \Cref{sec:full} presents the L1 scheme, and the final section reports the numerical results.
