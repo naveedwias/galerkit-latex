@@ -19,4 +19,4 @@ default destinations are the folders above):
 
 - SV estimator: `examples/convection_diffusion/sv_numerics/make_figures.py`, `make_exp36_figures.py`
 - BJK16: `examples/convection_diffusion/2d/bjk16_reproduction/make_report.py`
-- Kn23: `examples/convection_diffusion/2d/afc_kn23/make_report.py`
+- Kn23: `examples/convection_diffusion/2d/kn23_reproduction/make_report.py`

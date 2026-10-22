@@ -1,5 +1,5 @@
 % Reproduction of Knobloch, Numer. Algorithms 94 (2023) 1229-1267, with galerkit.
-% Tables and figures: galerkit examples/convection_diffusion/2d/afc_kn23/make_report.py --dest <this folder>
+% Tables and figures: galerkit examples/convection_diffusion/2d/kn23_reproduction/make_report.py --dest <this folder>
 \documentclass[11pt]{article}
 
 \usepackage[utf8]{inputenc}
@@ -46,6 +46,7 @@ Sections~5 and~6, and Figures~3, 4, 5, 7, 8, 9, 11 and~13. \input{tables/kn23_ab
 %=====================================================================================================
 
 \begin{table}[!htbp]
+\renewcommand{\thetable}{I}
 \centering\small\setlength{\tabcolsep}{4pt}
 \caption{What~\cite{Kn23} uses and where it is in galerkit (\texttt{src/galerkit/convection\_diffusion}).
 ``new'' marks what was added for this reproduction.}\label{tab:kn23-impl}
@@ -72,7 +73,7 @@ nonlinear solver ``fixed point rhs'' (Remark 5) & \texttt{afc\_solver="fp\_rhs"}
 \end{table}
 
 \textbf{Answer: yes.} All four methods of the paper were already implemented in galerkit, and Tables~1, 2, 4, 5
-(first row) and~8 had been checked before. The SMUAS implementation (\texttt{src/galerkit/convection\_diffusion/afc.py}, limiter \texttt{"smuas"}) was checked
+(first row) and~8 had been checked before. The SMUAS implementation (limiter \texttt{"smuas"} in\\ \texttt{src/galerkit/convection\_diffusion/afc.py}) was checked
 line by line against (61)--(68) of~\cite{Kn23}: the sums in $P_i^\pm$ run over $j\in S_i$ with $a_{ij}>0$ or
 $a_{ji}>0$ and those in $Q_i^\pm$ over all $j\in S_i$; the reflected values are $u_{ij}=u_i+\nabla u_h|_{T_{ij}}\cdot
 (x_i-x_j)$ with $T_{ij}$ the simplex of the patch entered by the half line $x_i+t(x_i-x_j)$, $t>0$; $R_i^\pm=1$ at
@@ -139,10 +140,13 @@ $B(U)=0$).
 The cost per evaluation of $B(U)$ is one sparse product $WU$ (the reflected values) plus edge loops, i.e.\ linear in
 the number of edges; the set-up S1 is a single pass over the patches.
 
-\paragraph{Implementation in galerkit.} S1 is \texttt{reflection\_operator} (a sparse matrix $W$ with one row per
-directed edge); B1--B5 are \texttt{AFCOperator.b\_edges}; N1--N3 are \texttt{solve\_afc} with
-\texttt{afc\_solver="fp\_rhs"}, \texttt{"fp\_anderson"} (with Anderson acceleration), or \texttt{"newton"}, the
-latter with the exact generalized Jacobian of SMUAS (\texttt{\_jacobian\_muas}).
+\paragraph{Implementation in galerkit.}
+\begin{itemize}[leftmargin=*, itemsep=1pt]
+\item S1: \texttt{reflection\_operator}, a sparse matrix $W$ with one row per directed edge;
+\item B1--B5: \texttt{AFCOperator.b\_edges};
+\item N1--N3: \texttt{solve\_afc} with \texttt{afc\_solver} set to \texttt{"fp\_rhs"}, \texttt{"fp\_anderson"}
+  (Anderson acceleration) or \texttt{"newton"} (exact generalized Jacobian of SMUAS, \texttt{\_jacobian\_muas}).
+\end{itemize}
 
 %=====================================================================================================
 \section{Set-up of the computations}\label{sec:setup}
@@ -219,7 +223,7 @@ Grid~4, where the oscillation is clearer than in the solution itself.}\end{figur
 
 \paragraph{Agreement.} Table~S shows the agreement for every recomputed table; together with the checks of
 Section~\ref{sec:checks} and the figures, every numerical statement of~\cite{Kn23} that does not depend on the
-FVCA5 meshes is reproduced. Three points of the set-up had to be inferred and are now fixed by the data: the
+FVCA5 meshes is reproduced (Table~5 up to $ne=256$). Three points of the set-up had to be inferred and are now fixed by the data: the
 $\sigma_0=1$ in $\|\cdot\|_h$ also for $c=0$ (Table~3), the counting of the ``odd horizontal grid lines'' in
 (47), (48), and the use of the (exact, recovered) Grids~2 and~3 of~\cite{BJK16}.
 
@@ -234,10 +238,13 @@ and only the coarsest of the six meshes is drawn in the paper (Fig.~12, right); 
 inferred from it. The run script reads any mesh as a \texttt{SimplexMesh}, so Table~10 can be added as soon as the
 files are available.
 
-\paragraph{Solvers.} The nonlinear problems were solved by semismooth Newton (Kuzmin, MUAS, SMUAS: exact generalized
-Jacobian), 7--60 iterations up to $ne=512$; for the Kuzmin limiter on Grid~4 at $ne=512$ the Anderson-accelerated
-fixed point rhs was used, as Newton becomes slow there (cf.\ the BJK16 reproduction). The SMUAS problems were
-never harder to solve than the Kuzmin ones, in line with Remark~5 of the paper.
+\paragraph{Solvers.} Semismooth Newton (exact generalized Jacobian for Kuzmin, MUAS and SMUAS) converged in
+7--53 iterations for Tables~1, 4 and 6--9 up to $ne=512$ (up to 40 minutes for the $5.3\cdot10^5$ unknowns of
+Grid~2). For the Kuzmin limiter on Grid~4 (Tables~2 and~3) the Anderson-accelerated fixed point rhs was used at
+$ne=256$ and~$512$ (8\,775 and 550 iterations at $ne=512$), as Newton becomes slow there. Table~5 (SMUAS with (68) on
+Grid~4) is reported up to $ne=256$: at $ne=512$ neither Newton nor the Anderson iteration had converged after
+1.5~hours, and the run was stopped. The paper's Remark~5 (fixed point rhs behaves for SMUAS as for the Kuzmin
+limiter) is therefore confirmed for (67) but not tested at the finest level for (68).
 
 \paragraph{Minimality and the sharper track.} The SMUAS properties used here are exactly those of Table~11 of the
 paper: DMP on arbitrary simplicial meshes (via (A2), which needs only $p_{ij}>0$ for $a_{ij}>0$, (66)), linearity
