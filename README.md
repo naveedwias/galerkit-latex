@@ -6,6 +6,7 @@ LaTeX sources (and compiled PDFs) of the reports written alongside the galerkit 
 | document | PDF | content |
 |---|---|---|
 | `convection_diffusion/sv_efficiency_proof.tex` (+ `numeric.tex`) | `sv_efficiency_proof.pdf` | guaranteed SV-type a posteriori estimator for AFC, efficiency proof and numerical results |
+| `convection_diffusion/sv_efficiency_proof_final.tex` | `sv_efficiency_proof_final.pdf` | final single-file version of the SV efficiency article (from galerkit branch `docs/sv-final-version`) |
 | `convection_diffusion/bjk16_reproduction.tex` | `bjk16_reproduction.pdf` | reproduction of Barrenechea, John & Knobloch, SINUM 54 (2016), Section 8 |
 | `navier_stokes/3d/numerical_example_3d.tex` | (not built: needs the `siunitx` package) | 3D Navier-Stokes numerical example |
 
