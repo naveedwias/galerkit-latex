@@ -1,0 +1,460 @@
+% Numerical experiments for sv_efficiency_proof.tex (included with \input{numeric}).
+% Data: examples/convection_diffusion/sv_numerics/run_numerics.py (output/*.json);
+% tables and figures: make_figures.py -> tables/*.tex, figures/sv_*.{pdf,png}.
+% All numbers quoted in the text below are read off those tables.
+
+% ===========================================================================
+\section{Numerical experiments}\label{sec:num}
+% ===========================================================================
+
+We test the estimator against the exact error. The questions are the ones raised by the theory:
+\begin{enumerate}[label=(Q\arabic*)]
+  \item Is the bound guaranteed, $E\le\eta_E$, in every run (Theorem~\ref{thm:rel})?
+  \item Are the effectivity indices bounded independently of $\eps$, $\sigma$ and the stabilisation
+  (Theorem~\ref{thm:eff}, Corollary~\ref{cor:two}), and do they stay bounded under refinement?
+  \item Does the dependence on $c_b$ follow Corollaries~\ref{cor:two} and~\ref{cor:twoc}?
+  \item Is the estimator locally efficient in the localisable measure (Theorem~\ref{thm:loc})?
+  \item Do the indicators drive adaptive refinement to the optimal rate?
+  \item Are the bounds valid at inexact iterates, and does the stopping criterion of
+  Proposition~\ref{prop:stop} save iterations without spoiling the error?
+  \item Does the variable-diffusion version keep its effectivity, with $\eta_\eps=O(h^2)$
+  (Theorem~\ref{thm:vareps})?
+\end{enumerate}
+
+\subsection{Setup}
+
+\paragraph{Discretisation.} Conforming $P_1$ elements on uniform meshes of the unit square
+($n\times n$ squares, each cut into two triangles; $N=(n+1)^2$ vertices) or the unit cube ($n^3$
+cubes, each cut into six tetrahedra), and on red--green refined meshes in the adaptive runs. The
+stabilisations are the AFC scheme with the limiter of \cite{BJK17} (BJK), and the symmetrised
+monotone upwind-type algebraic stabilisation of \cite{Kn23} (SMUAS). The nonlinear problem is solved
+by the damped fixed-point iteration of \cite{AJ27} up to $\|r\|\le10^{-10}\sqrt N$, with at most
+$2\cdot10^4$ iterations, unless stated otherwise.
+
+\paragraph{Test problems} (all with $b$ constant, so $\sigma=c$, $c_b=1$ and $\kappa=3$, except in
+Section~\ref{sec:num-cb}).
+\begin{itemize}
+  \item \emph{smooth}: $u=\prod_i\sin(\pi x_i)+x_1^2\prod_{i>1}x_i$, $b=(1,\tfrac12)$ or
+  $(1,\tfrac12,\tfrac14)$, Dirichlet data on $\partial\Omega$; $f$ is computed from $u$. The solution
+  has no layers, so its error is not dominated by layers, but for small $\eps$ the scheme is
+  convection-dominated on every mesh used.
+  \item \emph{layers}: $u=\prod_iw(x_i)$ with
+  $w(s)=s-\bigl(e^{(s-1)/\eps}-e^{-1/\eps}\bigr)/\bigl(1-e^{-1/\eps}\bigr)$, $b=(1,\dots,1)$, homogeneous
+  Dirichlet data; $u$ has exponential layers of width $\eps$ at the outflow boundary $x_i=1$.
+  \item \emph{variable diffusion}: $u=\phi(x_1)\prod_{i>1}4x_i(1-x_i)$, either with
+  $\eps(x)=\eps\,k^{x_1}$, $\phi(s)=4s(1-s)$ (\emph{smooth}), or with $\eps$ jumping from $\eps$ to $k\eps$
+  at $x_1=\frac12$ and $\phi$ chosen such that the flux $\eps\phi'$ is continuous (\emph{jump}); $k$ is
+  the contrast.
+\end{itemize}
+
+\paragraph{Error measures.} $\tnorm{e}$ is computed with a quadrature of degree~8. The dual norms
+$\|B_A'(e,\cdot)\|_*$ and $\|\Stil\|_*$, and the local dual norms of $E_{\mathrm{loc}}$, are computed
+from their Riesz representatives in the $P_2$ space on the same mesh (on each vertex patch for
+$E_{\mathrm{loc}}$). These are \emph{lower} bounds of the true dual norms, so the reported effectivity
+indices are slight overestimates; they become crude when the dual norm concentrates in layers that
+the mesh does not resolve (see Section~\ref{sec:num-robust}). We report the effectivity indices
+\[
+  I=\frac{\eta}{\tnorm{e}},\qquad I_\oplus=\frac{\kappa\eta}{\tnorm{e}_\oplus},\qquad
+  I_S=\frac{\eta_S}{\|\Stil\|_*},\qquad I_E=\frac{\eta_E}{E},
+\]
+of which $I_E$ is the one covered by Corollary~\ref{cor:two}; $I_\oplus\ge1$ and $I\ge1$ are guaranteed
+too, but only $I_\oplus$ is expected to be robust.
+
+\subsection{Solutions and indicators}
+
+Figure~\ref{fig:snap} shows the discrete solution of the layers problem for $\eps=10^{-3}$ on the
+$32\times32$ mesh, the cell indicators $\eta_K=\eta_{A,K}+\eta_{S,K}$, and the local energy errors
+$\tnorm{e}_K$. The mesh does not resolve the layers ($h\approx4.4\cdot10^{-2}\gg\eps$); the AFC
+solution is free of oscillations, and both the indicators and the error concentrate in the cells at
+the outflow boundary, with a decay of several orders of magnitude into the interior. The indicator
+is larger than $\tnorm{e}_K$ in the layer cells: it measures the residual in the dual norm, which
+contains the convective part $\|B_A'(e,\cdot)\|_*$ of the error.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/sv_snap.pdf}
+\caption{Layers problem, $\eps=10^{-3}$, $\sigma=0$, BJK, $n=32$: discrete solution $u_h$, indicators
+$\eta_K$ and local errors $\tnorm{e}_K$ (logarithmic colour scale, common to both).}
+\label{fig:snap}
+\end{figure}
+
+\subsection{Uniform refinement}\label{sec:num-conv}
+
+Table~\ref{tab:conv} and Figure~\ref{fig:conv} report uniform refinement from $n=8$ to $n=128$.
+\begin{itemize}
+  \item \textbf{Smooth solution, $\eps=10^{-2}$.} $E$ and $\eta_E$ converge at the optimal rate $1$ in
+  $h$ once the mesh resolves the solution; on the coarse meshes both decrease faster, because the
+  stabilisation term $\|\Stil\|_*$ dominates $E$ there and decreases at a higher rate. The effectivity
+  $I_E$ lies between $3.15$ and $3.29$ for $\sigma=0$ and $\sigma=1$ alike. The energy-norm index $I$
+  tends to $1.1$: in the diffusion-dominated regime the energy norm and the dual norm of the
+  residual coincide asymptotically.
+  \item \textbf{Layers, $\eps=10^{-2}$.} The layers are resolved only from $n=64$ on, and the
+  convergence of $E$ accelerates accordingly; $I_E$ stays between $2.77$ and $2.94$.
+  \item \textbf{Layers, $\eps=10^{-4}$.} The meshes never resolve the layers. The energy error
+  $\tnorm{e}$ \emph{increases} under refinement, because the error, concentrated in the outflow
+  cells, sees an increasing part of the layer, while $E$ is dominated by the convective dual norm and
+  decreases at the rate $0.45$--$0.53$; $\eta_E$ follows it with the rate $0.49$--$0.55$. The index $I_E$
+  is $3.07$--$3.31$ on every mesh, whereas the energy-norm index $I$ falls from $833$ to $18.7$: the
+  energy-norm bound is guaranteed but useless in this regime, which is why the error is measured in
+  $E$.
+\end{itemize}
+
+\input{tables/conv}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/sv_conv.pdf}
+\caption{Uniform refinement in 2D, BJK. Left: $E$ (solid) and $\eta_E$ (dashed, open markers).
+Right: effectivity index $I_E=\eta_E/E$.}
+\label{fig:conv}
+\end{figure}
+
+\subsection{Robustness in \texorpdfstring{$\eps$}{eps}, \texorpdfstring{$\sigma$}{sigma} and the stabilisation}\label{sec:num-robust}
+
+Table~\ref{tab:sweep} and Figure~\ref{fig:sweep} sweep $\eps$ from $10^{-1}$ to $10^{-8}$ on the fixed
+mesh $n=32$, for $\sigma\in\{0,1\}$, both stabilisations and both problems.
+\begin{itemize}
+  \item \textbf{$\sigma=0$.} $I_E$ lies in $2.80$--$3.23$ for the layers problem and in $3.15$--$3.78$
+  for the smooth problem, and becomes constant for $\eps\le10^{-5}$. $I_\oplus$ stays below $4.9$,
+  and the stabilisation part is estimated sharply, $I_S=1.21$--$1.34$. BJK and SMUAS give the
+  same indices $I_E$ and $I_\oplus$ to within $3\,\%$, as Remark~\ref{rem:robust} predicts: the limiter enters only
+  through the functional, not the constants.
+  \item \textbf{Energy norm.} The energy-norm index $I$ grows like $\eps^{-1}$ for $\sigma=0$, up to
+  $2.5\cdot10^6$ at $\eps=10^{-8}$; the guaranteed energy-norm bound of \cite{ABR17} behaves in the
+  same way. For $\sigma=1$, $I$ saturates at about $60$--$90$, the reaction giving $L^2$ control, while
+  the ABR17 bound keeps growing ($1.3\cdot10^4$ at $\eps=10^{-8}$), because its reaction cut-off is not
+  robust.
+  \item \textbf{$\sigma=1$, small $\eps$.} Down to $\eps=10^{-6}$, $I_E$ stays in $2.7$--$3.2$ for the
+  layers problem and in $3.2$--$4.9$ for the smooth one. For $\eps<10^{-6}$ it rises, to $5.5$ (layers)
+  and $6.0$ (smooth) at $\eps=10^{-8}$. This increase comes from $I_S$ ($7.8$ and $10.4$ at
+  $\eps=10^{-8}$), while $I_\oplus$ \emph{decreases}. This is consistent with a
+  reference effect rather than with a loss of robustness: for $\sigma>0$, the Riesz representative of
+  $\Stil$ has layers of width $(\eps/\sigma)^{1/2}=10^{-4}$, far below the mesh size $3\cdot10^{-2}$, so
+  the same-mesh $P_2$ reference underestimates $\|\Stil\|_*$. Theorem~\ref{thm:eff} bounds $\eta_S$ by
+  the true dual norm, independently of $\eps$. \adapt{The adaptive runs of Section~\ref{sec:num-unad} confirm this:
+  once the mesh resolves the layers, $I_S$ falls to $1.5$--$1.6$ and $I_E$ to about $3$.} \asref{The
+  asymptotic reference below makes this quantitative.}
+\end{itemize}
+
+\input{tables/sweep}
+
+{\color{teal}
+\paragraph{An asymptotically exact reference for $\|\Stil\|_*$.} For $\theta\ll1$ the dual norm of the
+stabilisation functional can be evaluated without resolving its Riesz representative. With
+$q=A\nabla u_h$ cellwise constant, $\Stil(v)=(q,\nabla v)=-\sum_F(\jump{q\cdot n},v)_F$ for $v\in H^1_D$, since
+$\dv q=0$ in each cell. Away from the vertices, the Riesz representative is a sum of one-dimensional layers
+$-\eps z''+\sigma z=\jump{q\cdot n}\,\delta_F$ across the faces, each of energy
+$\jump{q\cdot n}^2/(2(\eps\sigma)^{1/2})$ per unit length. Hence
+\begin{equation}\label{eq:Sasym}
+  \|\Stil\|_*^2=\sum_{F\text{ interior}}\frac{\|\jump{q\cdot n}\|_F^2}{2(\eps\sigma)^{1/2}}\,\bigl(1+O(\theta)\bigr),
+  \qquad \theta\to0,
+\end{equation}
+and the same sum over the faces interior to $\tilde\omega_K$ gives $\|\Stil\|_{*,\tilde\omega_K}^2$.
+Table~\ref{tab:refref} and Figure~\ref{fig:refref} compare this value with $P_2$ references on the same mesh and on
+$k$-times refined meshes ($k=2,4,8$), for the layers problem on the $16\times16$ mesh with $\sigma\in\{1,10^4\}$, using
+the A+S estimator alone (without the direct variant of Remark~\ref{rem:direct}).
+\begin{itemize}
+  \item \textbf{The references.} At $\theta=0.11$ the asymptotic value agrees with the refined reference to $1\,\%$
+  ($2.92$ against $2.95$). For smaller $\theta$ the $P_2$ references are far from converged: at $\theta=10^{-5}$ the
+  same-mesh value underestimates $\|\Stil\|_*$ by a factor $85$, and even the $8$ times refined one by a factor $30$.
+  \item \textbf{Theorem~\ref{thm:eff} for $\ell=-\Stil$.} Measured against \eqref{eq:Sasym}, the index
+  $I_S=\eta_{-\Stil}/\|\Stil\|_*$ lies in $1.64$--$2.22$ for all $\theta\le10^{-2}$; the local ratio
+  $\max_K\eta_{S,K}^2/\|\Stil\|_{*,\tilde\omega_K}^2$ lies in $0.58$--$1.56$. For this functional the theorem has no
+  oscillation term, so this is a direct confirmation of robust global and local efficiency in the reaction regime.
+  \item \textbf{The error measure.} With $\|\Stil\|_*$ from \eqref{eq:Sasym} and the other two parts of $E$ from the
+  $8$ times refined mesh, $\eta_E/E$ stays in $8.3$--$10.2$ over three decades of $\theta$, whereas the same-mesh
+  reference gives values up to $284$. The rises of $I_E$ in Table~\ref{tab:sweep} and in Section~\ref{sec:num-unad} at
+  small $\theta$ are therefore an artifact of the reference, not a loss of robustness.
+\end{itemize}
+}
+
+\input{tables/refref}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/sv_refref.pdf}
+\caption{\asref{Reaction regime, layers problem, $n=16$, A+S estimator; circles $\sigma=1$, squares $\sigma=10^4$.
+Left: $\eta_{-\Stil}/\|\Stil\|_*$ with $P_2$ references on $k$-times refined meshes and with the asymptotic value
+\eqref{eq:Sasym}. Middle: $\eta_E/E$ with the same-mesh and the $8$ times refined references, and with
+$\|\Stil\|_*$ from \eqref{eq:Sasym}. Right: the local ratio for $\ell=-\Stil$; the refined references are lower bounds
+of the local dual norms, so these ratios are upper estimates; the asymptotic value is valid only for $\theta\ll1$.}}
+\label{fig:refref}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/sv_sweep.pdf}
+\caption{Layers problem, $n=32$, as functions of $\eps$. Left: $I_E=\eta_E/E$. Right: the energy-norm
+indices $\eta/\tnorm{e}$ (solid) and, dotted with open markers, that of the guaranteed bound of
+\cite{ABR17}.}
+\label{fig:sweep}
+\end{figure}
+
+\subsection{Variable reaction}\label{sec:num-cb}
+
+With $c=1+(c_{\max}-1)xy$ and $\sigma=1$, the constant of (H3) is $\|c\|_\infty/\sigma=c_{\max}$, attained at
+the vertex $(1,1)$. \refe{The computed $c_b$ is the sampled enclosure of Remark~\ref{rem:CF}, which is diagnostic: $c$ is not
+affine on the cells, so the sampled maximum is enlarged by $\frac{h_K}2\max|\nabla c|$; here this gives} $c_b=1.12\,c_{\max}$, $1.06\,c_{\max}$
+and $1.03\,c_{\max}$ for $n=8,16,32$, and $\kappa=2+c_b$ (Table~\ref{tab:cb}). The bound $E\le\eta_E$ holds in
+all runs. The index of $\eta_{E,c}$ grows at most linearly, $\eta_{E,c}/E_c\le3\,c_b$ in all runs, as
+Corollary~\ref{cor:twoc} predicts; it is often much smaller, down to $0.05\,c_b$, because the factor $M=c_b$ in front of $\tnorm{e}$ in $E_c$ also enlarges the
+error measure. The index of $\eta_E$ grows faster, up to $5.2\,c_b$ at $c_b\approx10^3$, but stays far
+below the worst case $(1+c_b)^2$ of Corollary~\ref{cor:two}. A variable reaction with a small lower
+bound $\sigma$ is therefore the one situation in which the estimator loses its robustness, in
+accordance with the theory; Section~\ref{sec:concl} discusses how to remove it.
+
+\input{tables/cb}
+
+\subsection{Local efficiency}\label{sec:num-loc}
+
+Table~\ref{tab:loc} reports the localised measure for the layers problem on the $16\times16$ mesh. The
+local ratio $\max_K\eta_K^2/E_{\mathrm{loc}}(\tilde\omega_K)^2$ is at most $0.51$ in all cases, and
+independent of $\eps$ for $\eps\le10^{-4}$: the estimator is locally efficient, as stated in
+Theorem~\ref{thm:loc}. The ratio $E_{\mathrm{loc}}/E$ lies between $0.48$ and $1.01$, so on these
+problems the localised measure captures most of the global one, and the guaranteed bound
+$E_{\mathrm{loc}}\le\sqrt{d+1}\,\eta_E$ of Theorem~\ref{thm:loc} overestimates $E_{\mathrm{loc}}$ by a
+factor $5$--$12$. The largest value, $\eta_E/E_{\mathrm{loc}}=7.0$ for $\sigma=1$ and $\eps=10^{-8}$, is the
+same reference effect as in Section~\ref{sec:num-robust}.
+
+\input{tables/loc}
+
+\subsection{Adaptive refinement}\label{sec:num-adapt}
+
+Starting from the $8\times8$ mesh, we mark by the indicators $\eta_K=\eta_{A,K}+\eta_{S,K}$ with the
+dual strategy of \cite{AJ27} (all cells with $\eta_K\ge\theta\max\eta$, $\theta=0.5$, reduced until at least
+$5\,\%$ of the cells are marked) and refine by red--green refinement, until $N>3\cdot10^4$.
+Table~\ref{tab:adapt} and Figures~\ref{fig:adapt} and~\ref{fig:adaptmesh} show the results for the layers
+problem.
+\begin{itemize}
+  \item \textbf{Effectivity.} $I_E$ stays between $2.86$ and $3.55$ in every loop of all three runs, from
+  $N=81$ to $N=45\,094$, while the local mesh size spans three orders of magnitude.
+  \item \textbf{Where the mesh is refined.} The refinement concentrates in the outflow layers at $x=1$ and
+  $y=1$ (Figure~\ref{fig:adaptmesh}); the smallest cells have $h_{\min}=3.5\cdot10^{-4}$ for $\eps=10^{-3}$,
+  below $\eps$, so the layers are resolved, and $h_{\min}=1.7\cdot10^{-4}$ for $\eps=10^{-5}$, where they are not.
+  \item \textbf{Convergence.} For $\eps=10^{-3}$, $E$ decreases at the rate $1.8$--$1.9$ with respect to
+  $N^{-1/2}$ over the second half of the loops: this is the pre-asymptotic phase in which the layers become
+  resolved, faster than the optimal rate $1$. For $\eps=10^{-5}$ the rate is $0.98$. On the finest uniform mesh
+  ($N=16\,641$) the error $E$ is $18$, $4.4$ and $17$ times larger than the adaptive error at the same $N$.
+  Under uniform refinement $E$ decreases at the rate $0.46$--$0.60$ for $\sigma=0$ and $0.04$--$0.51$ for
+  $\sigma=1$, because the layers are never resolved; the index $I_E$ is $2.86$--$3.37$ there as well.
+  \item \textbf{Energy norm.} Along the adaptive runs the energy-norm index $I$ falls from $29$ to $1.1$
+  ($\eps=10^{-3}$) and from $8.4\cdot10^3$ to $6.2$ ($\eps=10^{-5}$): once the mesh resolves the layers, the
+  energy error and the dual norm of the residual become comparable, while $I_E$ is insensitive to this.
+\end{itemize}
+
+\input{tables/adapt}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/sv_adapt.pdf}
+\caption{Adaptive refinement, layers problem, BJK. Left: $E$ for adaptive (solid) and uniform (dotted, open
+markers) refinement, and $\eta_E$ for the adaptive runs (dashed). Right: $I_E$ along the adaptive runs.}
+\label{fig:adapt}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/sv_adapt_mesh.pdf}
+\caption{Final adaptive meshes, layers problem, $\sigma=0$.}
+\label{fig:adaptmesh}
+\end{figure}
+
+\subsection{\adapt{Uniform versus adaptive refinement}}\label{sec:num-unad}
+{\color{magenta}
+
+We repeat the uniform-mesh studies of Tables~\ref{tab:conv} and~\ref{tab:sweep} with adaptive refinement:
+the same problems, the same marking as in Section~\ref{sec:num-adapt}, from the $8\times8$ mesh up to
+$N\approx2\cdot10^4$ (Table~\ref{tab:conv}) and $N\approx10^4$ (Table~\ref{tab:sweep}). For the robustness
+sweep we compare at equal cost: the adaptive loop whose $N$ is closest to $N=1089$, the size of the $32\times32$
+mesh of Table~\ref{tab:sweep}.
+
+\paragraph{Refinement studies (Figure~\ref{fig:aconv}).}
+\begin{itemize}
+  \item \textbf{Effectivity.} Along the adaptive runs $I_E$ lies in $2.83$--$4.18$ and tends to the same values
+  as on uniform meshes, about $3.0$--$3.2$. The bound held in every loop.
+  \item \textbf{Accuracy.} For the smooth solution, adaptive refinement gains nothing: at $N=16\,641$ the two
+  errors agree to within $1\,\%$, and $E$ converges at the rate $1$ in both cases. For the layers problem the
+  uniform error is $5.4$ ($\eps=10^{-2}$) and $5.9$ ($\eps=10^{-4}$) times the adaptive one at the same $N$.
+  For $\eps=10^{-4}$, $E$ converges at the rate $0.47$ under uniform refinement and at $1.4$--$1.9$ in the last
+  adaptive loops, in which the layers become resolved.
+\end{itemize}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/sv_aconv.pdf}
+\caption{\adapt{The cases of Table~\ref{tab:conv} under adaptive refinement. Left: $E$ for adaptive (solid) and uniform
+(dotted, open markers) refinement, and $\eta_E$ for the adaptive runs (dashed). Right: $I_E$, adaptive (solid) and
+uniform (dotted).}}
+\label{fig:aconv}
+\end{figure}
+
+\paragraph{Robustness sweep (Figures~\ref{fig:abudget} and~\ref{fig:aloops}).}
+\begin{itemize}
+  \item \textbf{$\sigma=0$.} At equal cost, $I_E=2.89$--$3.22$ on the adaptive meshes against $2.80$--$3.23$ on the
+  uniform mesh, for all $\eps$ and both stabilisations, and it stays in $2.82$--$3.35$ over all loops: the
+  estimator is as robust on the meshes it generates as on the fixed mesh.
+  \item \textbf{$\sigma=1$, small $\eps$.} The rise of $I_E$ to $5.4$--$5.5$ on the uniform mesh at
+  $\eps\le10^{-7}$ (Section~\ref{sec:num-robust}) does not occur at equal cost on the adaptive meshes, where
+  $I_E=2.75$--$3.16$. Figure~\ref{fig:aloops} shows why. The large values, up to $9.6$, appear only on the
+  coarse initial mesh, and they come from the stabilisation part: $I_S=17.8$ at $N=81$ for $\eps=10^{-8}$. As the
+  mesh resolves the layers, $I_S$ falls to $1.5$--$1.6$ and $I_E$ returns to about $3$. This confirms that the
+  rise on the uniform mesh is a property of the under-resolved $P_2$ reference for $\|\Stil\|_*$, not of the
+  estimator.
+  \item \textbf{Smooth problem.} For $\eps\le10^{-3}$ the adaptive indices are higher than the uniform ones at
+  equal cost: $I_E=4.0$--$5.3$ against $3.6$--$3.8$ for $\sigma=0$, and $4.5$--$6.0$ against $3.9$--$6.0$ for
+  $\sigma=1$. Along the runs they reach $7.8$ after the first loop, and $10.9$ on the initial mesh. For $\sigma=1$
+  and $\eps\le10^{-6}$ the fixed-point iteration reaches the iteration limit $2\cdot10^4$ on most meshes beyond
+  $N\approx1100$, and the bound holds at these iterates.
+  \item \textbf{Energy norm.} At $\sigma=0$ the energy-norm index still grows like $\eps^{-1}$ on the adaptive meshes,
+  to $4\cdot10^5$ at $\eps=10^{-8}$ (uniform: $2.5\cdot10^6$); only the augmented measure is robust.
+  \item \textbf{An open point.} For the layers problem with $\sigma=1$ and $\eps=10^{-6}$, $I_E$ rises again in the
+  last loops, from $2.8$ to $4.3$, together with $I_\oplus$ (from $3.2$ to $6.6$). We have not identified the cause;
+  it may be the convective part of the reference becoming resolved, and would need runs beyond $N=10^4$.
+\end{itemize}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/sv_asweep_budget.pdf}
+\caption{\adapt{The robustness sweep of Table~\ref{tab:sweep} at equal cost, layers problem: adaptive meshes with
+$N\approx1089$ (solid) against the uniform $32\times32$ mesh (dotted, open markers). Left: $I_E$. Right: the
+energy-norm index $\eta/\tnorm{e}$.}}
+\label{fig:abudget}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/sv_asweep_loops.pdf}
+\caption{\adapt{$I_E$ along the adaptive runs of the robustness sweep, layers problem, BJK; one line per $\eps$, darker for
+smaller $\eps$.}}
+\label{fig:aloops}
+\end{figure}
+
+\paragraph{Which refinement to use.} For computing solutions, adaptive refinement is clearly preferable when the
+solution has layers, by factors $4$--$18$ in $E$ at equal $N$, and it is what the estimator is designed for. For
+testing the theory, the uniform meshes remain the primary evidence: a fixed coarse mesh keeps the layers
+unresolved, which is the regime in which robustness can fail, isolates the dependence on $\eps$ and $\sigma$, and
+is the only setting in which rates in $h$ are meaningful. The adaptive runs confirm that the effectivity stays at
+about $3$ on the meshes the estimator generates itself.
+}% end of the magenta block
+
+\subsection{Inexact iterates and adaptive stopping}\label{sec:num-stop}
+
+\paragraph{Iterates.} Table~\ref{tab:iter} and Figure~\ref{fig:iter} evaluate the estimator at the
+fixed-point iterates $u^i$ on the $16\times16$ mesh. The index $I_E$ stays between $2.9$ and $5.3$ at
+every iterate, including the first one, where the algebraic part $\eta_{\mathrm{alg}}$ is up to $71\,\%$
+of $\eta_{\mathrm{disc}}$: this is part~2 of Proposition~\ref{prop:stop}, efficiency at every iterate
+without any condition on the algebraic error. The ratio $\eta_{\mathrm{alg}}/\eta_{\mathrm{disc}}$
+decreases monotonically for all problems except the smooth one with $\eps=10^{-6}$ and $\sigma=0$, for
+which the fixed-point iteration does not converge in $2\cdot10^4$ iterations; there the ratio stalls
+between $10^{-3}$ and $4\cdot10^{-3}$. In that case the error is smallest at $i\approx10$, $E(u^{10})=4.8$, and grows to
+$8.4$ at $i=2\cdot10^4$: further iterations make the iterate worse in $E$, and the estimator, which is
+efficient at every iterate, reflects this.
+
+\input{tables/iter}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/sv_iter.pdf}
+\caption{Fixed-point iterates, BJK, $\sigma=0$, $n=16$. Left: $I_E$ at the iterate $u^i$. Right: the
+ratio $\eta_{\mathrm{alg}}/\eta_{\mathrm{disc}}$ (points with a ratio below $10^{-8}$ are omitted).}
+\label{fig:iter}
+\end{figure}
+
+\paragraph{Adaptive stopping.} Table~\ref{tab:stop} runs five adaptive loops \refe{as in} Section~\ref{sec:num-adapt}
+in which the fixed-point iteration is stopped either at the fixed tolerance $\|r\|\le10^{-10}\sqrt N$ or by
+the criterion \eqref{eq:stop}, $\eta_{\mathrm{alg}}\le\gamma\eta_{\mathrm{disc}}$, with
+$\eta_{\mathrm{disc}}=\eta_E-\eta_{\mathrm{alg}}$; each loop starts from the zero initial guess.
+\begin{itemize}
+  \item \textbf{Savings.} With $\gamma=0.1$, the total number of iterations drops from $227$ to $25$ (smooth,
+  $\eps=10^{-2}$) and from $2323$ to $25$ (layers, $\eps=10^{-4}$), by factors $9$ and $93$; with $\gamma=0.01$
+  the factors are $4.5$ and $46$.
+  \item \textbf{Accuracy.} The final error $E$ changes by at most $6\,\%$ ($\gamma=0.1$, layers) and by at most
+  $0.3\,\%$ for $\gamma\le0.01$. The index $I_E$ stays in $3.1$--$4.8$ in all runs, and in every stopped loop
+  $\eta_{\mathrm{alg}}/\eta_{\mathrm{disc}}\le\gamma$, so $E\le(1+\gamma)\eta_{\mathrm{disc}}$
+  (Proposition~\ref{prop:stop}, part~3).
+  \item \textbf{Non-converging iteration.} For the smooth problem with $\eps=10^{-6}$ the fixed-point
+  iteration does not reach the tolerance within $10^4$ iterations on any mesh, and $50\,000$ iterations give
+  $E=3.22$. The criterion with $\gamma=0.1$ stops after $5$--$15$ iterations per loop, $50$ in total, with a
+  \emph{smaller} error, $E=1.98$: as in Figure~\ref{fig:iter}, the early iterates are better than the late
+  ones. For $\gamma=10^{-3}$ the criterion fires in only one of the five loops, since $\eta_{\mathrm{alg}}/\eta_{\mathrm{disc}}$ stalls
+  at about $3\cdot10^{-3}$; this is a property of the iteration, not of the estimator.
+\end{itemize}
+
+\input{tables/stop}
+
+\subsection{Variable diffusion}\label{sec:num-vareps}
+
+Table~\ref{tab:vareps} reports the variable-diffusion problems on the meshes $n=8,16,32$. All bounds are
+guaranteed. For the smooth coefficient, the oscillation $\eta_\eps$ converges at the rate $2.09$--$2.13$
+in $h$, in accordance with Lemma~\ref{lem:V}(iii), and is at most $12\,\%$ of $\eta$ (at contrast $10^4$ on
+the coarsest mesh). For the jump aligned with the mesh, $\Pi_1\eps=\eps$ and $\eta_\eps=0$. The
+effectivity $I_E$ lies in $2.6$--$4.5$ for contrasts up to $10^4$, for $\eps=10^{-2}$ and $10^{-6}$ alike. For
+the jump it does not grow with the contrast; for the smooth coefficient it grows mildly, from
+$3.1$ at contrast $1$ to at most $4.3$ at contrast $10^4$ (on the coarsest mesh). This is the quasi-monotone case; the constants of
+Theorem~\ref{thm:vareps} depend on the patch contrast, but for an aligned jump that contrast does not
+show up in the indices. Checkerboard (non-quasi-monotone) coefficients are not tested; for them no
+local estimator can be robust \cite{Li26}.
+
+\input{tables/vareps}
+
+\subsection{Three dimensions}\label{sec:num-3d}
+
+Table~\ref{tab:d3} repeats the uniform-refinement study on the unit cube ($n=4,8,16$, up to $N=4913$
+vertices and $24\,576$ tetrahedra).
+\begin{itemize}
+  \item \textbf{Layers.} $I_E=2.94$--$3.55$ for $\eps=10^{-2}$ and $10^{-6}$, as in two dimensions; $I_\oplus\le4.9$
+  and $I_S=1.21$--$1.26$.
+  \item \textbf{Smooth solution.} $I_E$ is higher than in two dimensions, $5.1$--$6.4$, but decreases under
+  refinement for both values of $\eps$ ($5.97\to5.40$ and $6.39\to5.09$). These meshes are coarse: $E$ still
+  converges at the pre-asymptotic rates $2.1$--$2.7$ in $h$, dominated by the stabilisation part
+  $\|\Stil\|_*$, which is estimated sharply ($I_S=1.28$--$1.31$); the larger index comes from the convective
+  dual norm on coarse tetrahedral meshes. For $\eps=10^{-6}$ on the finest mesh the fixed-point iteration does
+  not converge within $2\cdot10^4$ iterations, and the bound still holds at the last iterate.
+  \item \textbf{Energy norm.} As in two dimensions, $I$ is useless for $\sigma=0$ and small $\eps$
+  ($1.0\cdot10^4$--$1.4\cdot10^5$ at $\eps=10^{-6}$, against $2.6$--$9.3$ at $\eps=10^{-2}$), while $I_E$ is not
+  affected.
+  \item \textbf{Cost.} The estimator takes about $8$\,s at $N=729$ and $220$--$240$\,s at $N=4913$ in our
+  Python implementation; the cost is dominated by the vertex-patch problems in $\RTN$, whose size grows
+  quickly with the number of tetrahedra per patch in three dimensions. The patch problems are independent and
+  can be solved in parallel; the global $\RT_0$ defect problem takes a small fraction of the time.
+\end{itemize}
+
+\input{tables/d3}
+
+\subsection{Summary}
+
+The experiments answer the questions (Q1)--(Q7) as follows.
+\begin{enumerate}[label=(Q\arabic*)]
+  \item The bound $E\le\eta_E$ held in every run: two and three dimensions, both stabilisations,
+  $\eps=10^{-1},\dots,10^{-8}$, $\sigma\in\{0,1\}$, variable reaction and diffusion, adaptive meshes and inexact
+  iterates\refe{, and so did $I\ge1$, $I_\oplus\ge1$ and $I_S\ge1$. Since the references are lower bounds of the dual
+  norms, this is a consistency check rather than a proof}.
+  \item For constant coefficients, $I_E$ lies in $2.6$--$5.3$ in two dimensions, inexact iterates included,
+  independently of $\eps$, $\sigma$, the stabilisation and the mesh; the only exception is a rise to $6.0$
+  ($n=32$) and $7.1$ ($n=16$) at $\sigma=1$, $\eps\le10^{-7}$, \adapt{which the adaptive runs identify as an
+  under-resolved reference for $\|\Stil\|_*$ (Section~\ref{sec:num-unad})}\asref{, as the asymptotically exact
+  reference \eqref{eq:Sasym} confirms ($I_S=1.6$--$2.2$ and $\eta_E/E=8.3$--$10.2$ for $\theta$ down to $10^{-5}$)}; in three dimensions it is $2.9$--$6.4$ and
+  decreases under refinement. The energy-norm index $I$, and the guaranteed bound of \cite{ABR17}, are not
+  robust.
+  \item The effectivity grows with $c_b$, at most linearly for $\eta_{E,c}$ and well below $c_b^2$ for $\eta_E$:
+  a variable reaction with a small lower bound is the one case in which robustness is lost, as the theory
+  predicts.
+  \item The local ratio $\max_K\eta_K^2/E_{\mathrm{loc}}(\tilde\omega_K)^2$ is at most $0.51$.
+  \item Adaptive refinement driven by $\eta_K$ resolves the layers and reduces $E$ by factors $4$--$18$
+  against uniform refinement at equal $N$, with $I_E=2.9$--$3.6$ throughout. \adapt{Repeating the refinement and
+  robustness studies adaptively gives the same effectivity, about $3$, as on uniform meshes.}
+  \item The estimator is efficient at every iterate, and the stopping criterion saves up to $99\,\%$ of the
+  iterations at a change of the error of at most $6\,\%$ ($\gamma=0.1$) or $0.3\,\%$ ($\gamma\le0.01$).
+  \item For variable diffusion, $\eta_\eps$ converges at rate $2$ and $I_E$ stays in $2.6$--$4.5$ up to contrast
+  $10^4$.
+\end{enumerate}
+
+\paragraph{Reproducibility.} All results are produced by the scripts \texttt{run\_numerics.py} and
+\texttt{make\_figures.py} in the directory
+\path{examples/convection_diffusion/sv_numerics} of \texttt{galerkit}. The first runs the experiments (about
+$35$ minutes on four cores, the three-dimensional runs sequentially because of their memory use); the
+second writes the tables, the figures and, for every stored solution, a VTK file
+(\texttt{.vtu}) with $u_h$, $u$, $u-u_h$, $\eps$, $\eta_K$, $\tnorm{e}_K$ and the local effectivity
+$\eta_K/\tnorm{e}_K$. \adapt{The figures of Section~\ref{sec:num-unad} are produced by
+\texttt{make\_adaptive\_figures.py} in the same directory.}
+

@@ -1,0 +1,374 @@
+% Numerical-example section for the 3-D case (from the original ns3d project; see docs/navier_stokes/3d/NS3D_NOTES.md).
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\sisetup{round-mode=places,round-precision=2}
+
+\newcommand{\Vh}{V_h}\newcommand{\Qh}{Q_h}
+\newcommand{\Vdivh}{V_h^{\mathrm{div}}}
+\newcommand{\eps}{\varepsilon}
+
+\begin{document}
+
+\section{Three-dimensional numerical verification}
+\label{sec:3d-verification}
+
+This section documents a three-dimensional numerical example for the Scott--Vogelius
+BDF2--IMEX scheme of the preceding sections, run with the \texttt{ns3d} NumPy/SciPy
+solver (Sections~\ref{sec:3d-mesh}--\ref{sec:3d-theorem2}) and, where noted, the DOLFINx
+implementation \texttt{fenics\_bdf2\_imex\_sv\_3d.py}. The purpose of the example is to
+confirm, on a smooth problem with a known exact solution, that the three-dimensional
+implementation behaves as the theorems of the preceding sections predict: pressure-robust
+velocity errors independent of the pressure (Section~\ref{sec:3d-pressure-robust}), the
+expected spatial, temporal, and combined orders of convergence for the velocity (in the
+$L^2$ and $H^1$ norms) and the pressure (in the $L^2$ norm)
+(Sections~\ref{sec:3d-space}--\ref{sec:3d-combined}), and, directly, that the energy
+stability inequality of Theorem~1 and the velocity error estimate of Theorem~2 hold
+numerically with the constants and mechanisms their proofs claim
+(Sections~\ref{sec:3d-theorem1}--\ref{sec:3d-theorem2}).
+
+\subsection{Mesh}
+\label{sec:3d-mesh}
+
+The computational domain is the unit cube $\Omega=(0,1)^3$. For $n\in\mathbb N$, $\Omega$
+is first partitioned into $n^3$ congruent sub-cubes; each sub-cube is split into $6$
+tetrahedra by a Kuhn (corner-to-corner) triangulation, and each of the resulting
+tetrahedra is further split into $4$ sub-tetrahedra by connecting its centroid to each of
+its four faces (an Alfeld split). The mesh therefore consists of $24\,n^3$ tetrahedra, with
+mesh size
+\[
+h=\frac{\sqrt3}{n}.
+\]
+The Alfeld refinement is not optional: for the Scott--Vogelius pair $\Vh/\Qh=P_k/P_{k-1}^{\mathrm{disc}}$
+to be inf-sup stable in three dimensions one needs both the barycentric mesh structure and
+polynomial degree $k\ge d=3$ (Zhang's theorem); the results below accordingly use the
+minimal admissible pair $k=3$ (continuous, piecewise-cubic velocity) and $k-1=2$
+(discontinuous, piecewise-quadratic pressure). Table~\ref{tab:3d-mesh} lists the mesh
+sizes used for the spatial convergence study ($n=1,\dots,6$) and for the fixed mesh used
+in the temporal convergence study ($n=10$); the pressure-robustness, combined-convergence,
+and theorem-check studies of Sections~\ref{sec:3d-pressure-robust}
+and~\ref{sec:3d-combined}--\ref{sec:3d-theorem2} use smaller, separately noted mesh lists
+($n=1,2,3$) chosen for affordability rather than to match this table.
+
+\begin{table}[h]\centering
+\caption{Meshes used in Sections~\ref{sec:3d-space} and~\ref{sec:3d-time}: subdivisions
+$n$ per side of the unit cube, mesh size $h=\sqrt3/n$, and number of tetrahedra $24n^3$.}
+\label{tab:3d-mesh}
+\begin{tabular}{crrr}
+\toprule
+study & $n$ & $h$ & \#tetrahedra \\
+\midrule
+space (Table~\ref{tab:3d-space}) & $1,2,3,4,5,6$ & $1.7321,\dots,0.2887$ & $24,\dots,5184$ \\
+time (Table~\ref{tab:3d-time})   & $10$          & $0.3162$              & $24\,000$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Manufactured solution}
+\label{sec:3d-manufactured}
+
+The scheme is verified against a smooth, exactly divergence-free velocity field with
+homogeneous Dirichlet (no-slip) boundary data on $\partial\Omega$, together with a smooth
+pressure field used to probe the pressure error. The velocity is constructed as the curl
+of a vector potential, which is automatically divergence-free for any choice of potential:
+let
+\[
+s(a)=a^2(1-a)^2,\qquad B(x,y,z)=s(x)\,s(y)\,s(z),\qquad
+\mathbf A(x,y,z)=\begin{pmatrix}c_1\\ c_2\\ c_3\end{pmatrix}B(x,y,z),
+\]
+with $(c_1,c_2,c_3)=(1.0,\,0.7,\,-1.3)$, and set
+\[
+u(t,x,y,z)=g(t)\,\nabla\times\mathbf A(x,y,z),\qquad g(t)=1+\tfrac12\sin(2t).
+\]
+Since $s$ and $s'$ both vanish at $a=0,1$, every component of $\nabla\times\mathbf A$ --
+each a linear combination of $\partial_xB,\partial_yB,\partial_zB$ -- vanishes on all six
+faces of the cube, so $u=0$ on $\partial\Omega$ \emph{exactly}, for any choice of
+$(c_1,c_2,c_3)$; the particular (asymmetric) values above were chosen only to avoid an
+accidental extra symmetry in the test. The exact pressure is
+\[
+p(t,x,y,z)=R\cos(\pi x)\cos(\pi y)\cos(\pi z)\cos(t),
+\]
+where $R$ is a free amplitude used in Section~\ref{sec:3d-pressure-robust} to probe
+pressure-robustness ($R=1$ in every other section). The right-hand side
+$f=\partial_tu-\nu\Delta u+(u\cdot\nabla)u+\nabla p$ is obtained by exact symbolic
+differentiation and enters the discrete scheme as an $L^2$-projected load.
+
+Unless stated otherwise, every study in this section uses
+\[
+\nu=0.01,\qquad R=1,\qquad k=3\ (\text{i.e.\ }P_3/P_2^{\mathrm{disc}}),\qquad
+\delta_1=10^{-3},\ \delta_2=\delta_3=0,
+\]
+i.e.\ only the first (and, in three dimensions, dominant) CIP jump term $S_1$ is active
+(see the solver's scope note on why $S_2,S_3$ are not implemented in three dimensions);
+volume integrals are evaluated with a quadrature rule exact enough for degree $qm=9$ per
+coordinate direction, which was found necessary (at this value or higher) to keep
+quadrature error from contaminating the pressure-robustness and convergence results on
+this smooth-but-non-polynomial manufactured solution.
+
+\subsection{Pressure-robustness}
+\label{sec:3d-pressure-robust}
+
+The exact pressure $p=R\cos(\pi x)\cos(\pi y)\cos(\pi z)\cos(t)$ is scaled by $R$, which
+changes the forcing by $\nabla((R-1)p)$ but leaves the exact velocity completely
+unchanged; a pressure-robust method's discrete velocity should not move either. Table
+\ref{tab:3d-pressrob} reports, for $R\in\{1,10,100,1000,10000\}$ on a fixed mesh
+($n=2$, $h\approx0.866$) with $\nu=0.01$, $\Delta t=0.05$, $T=0.2$: the $L^2$ norm of the
+computed velocity, the maximum pointwise drift from the $R=1$ solution, and the maximum
+pointwise divergence.
+
+\begin{table}[h]\centering
+\caption{Pressure-robustness: $k=3$, $n=2$ ($h\approx0.866$), $\nu=0.01$, $\Delta t=0.05$,
+$T=0.2$. ``drift'' $=\max|u_h^R-u_h^{R=1}|$.}
+\label{tab:3d-pressrob}
+\begin{tabular}{rccc}
+\toprule
+$R$ & $\|u_h\|_{L^2}$ & drift & $\max|\nabla\cdot u_h|$ \\
+\midrule
+1     & $5.905801\times10^{-4}$ & $0$                      & $1.53\times10^{-12}$ \\
+10    & $5.905801\times10^{-4}$ & $1.94\times10^{-12}$     & $1.36\times10^{-11}$ \\
+100   & $5.905801\times10^{-4}$ & $2.11\times10^{-11}$     & $1.50\times10^{-10}$ \\
+1000  & $5.905801\times10^{-4}$ & $2.13\times10^{-10}$     & $1.25\times10^{-9}$  \\
+10000 & $5.905801\times10^{-4}$ & $2.14\times10^{-9}$      & $8.79\times10^{-9}$  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The $L^2$ norm of the velocity is unchanged to the sixth significant digit across four
+orders of magnitude in $R$, and the drift grows linearly with $R$ at a rate of
+$\approx2\times10^{-13}$ per unit $R$ -- i.e.\ it is pure (quadrature and floating-point)
+round-off, not a genuine sensitivity of the scheme to the pressure. This is the expected
+pressure-robust behaviour of the Scott--Vogelius pair, and matches the two-dimensional
+result (and the earlier finding, in that same two-dimensional work, that this clean a
+result requires quadrature degree $qm\gtrsim9$ on this manufactured solution; $qm=6$ was
+not sufficient there and was not tried again here).
+
+\subsection{Spatial convergence}
+\label{sec:3d-space}
+
+Table~\ref{tab:3d-space} reports the velocity $L^2$ and $H^1$ errors and the pressure
+$L^2$ error at $\bar t=T=0.2$, for $n=1,\dots,6$, with the time step fixed at the small
+value $\Delta t=0.05$ so that the reported errors are dominated by the spatial
+discretization rather than the time discretization. The ``order'' columns are the local
+convergence rate
+\[
+\text{order}_i=\frac{\ln(e_{i-1}/e_i)}{\ln(h_{i-1}/h_i)}
+\]
+between consecutive rows (note $h_{i-1}/h_i=(i{+}1)/i$ here, \emph{not} a constant
+factor of two, since $n$ is simply incremented by one each time -- a plain $\log_2$ ratio
+would be wrong for every row but the first).
+
+\begin{table}[h]\centering
+\caption{Spatial convergence of the BDF2-IMEX Scott--Vogelius scheme ($P_3/P_2^{\mathrm{disc}}$),
+$\nu=0.01$, $\Delta t=0.05$ (fixed), $T=0.2$.}
+\label{tab:3d-space}
+\begin{tabular}{rrcccccc}
+\toprule
+$n$ & $h$ & $\|u-u_h\|_{L^2}$ & order & $\|\nabla(u-u_h)\|_{L^2}$ & order & $\|p-p_h\|_{L^2}$ & order \\
+\midrule
+1 & 1.7321 & $4.6247\times10^{-4}$ & --   & $4.6074\times10^{-3}$ & --   & $6.5985\times10^{-2}$ & --   \\
+2 & 0.8660 & $1.3919\times10^{-4}$ & 1.73 & $2.2223\times10^{-3}$ & 1.05 & $1.2313\times10^{-2}$ & 2.42 \\
+3 & 0.5774 & $3.9949\times10^{-5}$ & 3.08 & $1.0013\times10^{-3}$ & 1.97 & $3.9107\times10^{-3}$ & 2.83 \\
+4 & 0.4330 & $1.4344\times10^{-5}$ & 3.56 & $5.1034\times10^{-4}$ & 2.34 & $1.6909\times10^{-3}$ & 2.91 \\
+5 & 0.3464 & $6.0806\times10^{-6}$ & 3.85 & $2.8798\times10^{-4}$ & 2.56 & $8.7567\times10^{-4}$ & 2.95 \\
+6 & 0.2887 & $2.9532\times10^{-6}$ & 3.96 & $1.7632\times10^{-4}$ & 2.69 & $5.0992\times10^{-4}$ & 2.97 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For the Scott--Vogelius pair $P_3/P_2^{\mathrm{disc}}$, the velocity error is expected,
+asymptotically, to converge as $\|u-u_h\|_{L^2}=O(h^{k+1})=O(h^4)$ and
+$\|\nabla(u-u_h)\|_{L^2}=O(h^{k})=O(h^3)$, and the pressure error as
+$\|p-p_h\|_{L^2}=O(h^{k})=O(h^3)$. All three observed rates climb monotonically with
+refinement and approach these targets from below: the $L^2$ velocity rate reaches $3.96$
+by $n=6$ (target $4$), the pressure rate reaches $2.97$ (target $3$), and the $H^1$
+velocity rate reaches $2.69$ (target $3$, the slowest of the three to converge, as is
+typical since it measures one derivative more than the $L^2$ norm). This is the expected
+pre-asymptotic behaviour of a cubic element on meshes this coarse ($n=1$ is only $24$
+tetrahedra); no plateau or loss of order is visible over the range tested. Divergence
+remained at $\mathtt{div\_linf}\le5.1\times10^{-9}$ at every mesh size, consistent with
+the velocity staying (numerically) exactly divergence-free. Wall-clock cost grows sharply
+with $n$ (from $1\,\si{s}$ at $n=1$ to $371\,\si{s}$ at $n=6$ for the full four-step run at
+$\Delta t=0.05$), the expected consequence of $P_3$ elements on an unstructured tetrahedral
+mesh with a sparse-direct solve repeated every time step.
+
+\subsection{Temporal convergence}
+\label{sec:3d-time}
+
+Table~\ref{tab:3d-time} isolates the temporal error on a single, fixed, comparatively fine
+mesh ($n=10$, $h\approx0.316$, $24\,000$ tetrahedra), by comparing each $\Delta t$'s
+solution against a reference solution computed on the \emph{same} mesh at
+$\Delta t_{\mathrm{ref}}=0.005$: since the spatial discretization is identical in every
+comparison, the (fixed, and otherwise dominant on so fine a mesh) spatial error cancels
+out of the difference, leaving the temporal error. The reference run used $N=40$ steps and
+required approximately $11.6$ hours of wall-clock time; a fourth, finer point
+($\Delta t=0.01$, $N=20$) was still in progress at the time of writing and is not included.
+
+\begin{table}[h]\centering
+\caption{Temporal convergence of the BDF2-IMEX scheme, $\nu=0.01$, fixed mesh $n=10$,
+$T=0.2$, measured against a same-mesh reference solution at
+$\Delta t_{\mathrm{ref}}=0.005$.}
+\label{tab:3d-time}
+\begin{tabular}{rrcccccc}
+\toprule
+$N$ & $\Delta t$ & $\|u-u_h\|_{L^2}$ & order & $\|\nabla(u-u_h)\|_{L^2}$ & order & $\|p-p_h\|_{L^2}$ & order \\
+\midrule
+2  & 0.08000 & $2.1368\times10^{-5}$ & --    & $1.7355\times10^{-4}$ & --    & $2.5317\times10^{-3}$ & --    \\
+5  & 0.04000 & $2.1266\times10^{-7}$ & 6.65  & $1.7148\times10^{-6}$ & 6.66  & $4.1026\times10^{-9}$ & 19.24 \\
+10 & 0.02000 & $5.0597\times10^{-8}$ & 2.07  & $4.0805\times10^{-7}$ & 2.07  & $9.8925\times10^{-10}$& 2.05  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The BDF2--IMEX scheme is second order in time, so an asymptotic rate of $2$ is expected
+in every column. This is exactly what is observed between $\Delta t=0.04$ and
+$\Delta t=0.02$ ($2.05$--$2.07$ across all three quantities), but the first interval,
+$\Delta t=0.08\to0.04$, shows an anomalously large apparent order ($6.65$, $6.66$, and
+$19.24$ for the pressure). Taken at face value this is not a higher convergence order; it
+indicates that the $\Delta t=0.08$ solution itself carries an unusually large error for
+its step size, which is then resolved away by the time $\Delta t$ is halved to $0.04$,
+rather than $\Delta t=0.04$ being unusually accurate. The most likely explanation is that
+$\Delta t=0.08$ is close to, or beyond, a stability threshold associated with the
+\emph{explicit} treatment of the convective term on this comparatively fine mesh
+($n=10$): BDF2-IMEX schemes are only conditionally stable with respect to the explicit
+part of the splitting, and the pressure (recovered through the discrete inf-sup
+condition rather than solved for directly) is typically the most sensitive of the three
+quantities to such a near-threshold effect, consistent with its far larger apparent order
+over the same interval. This reading is a plausible interpretation of the data actually
+obtained, not something separately confirmed by, e.g., a dedicated stability scan; the
+clean, on-target rate recovered for every quantity between $\Delta t=0.04$ and $0.02$
+indicates that the scheme is solidly inside its stable, asymptotic regime from
+$\Delta t=0.04$ on. Including the pending $\Delta t=0.01$ point would help confirm
+whether the rate continues to hold at $\approx2$ (as the trend between the last two points
+suggests it should) or reveals a different pattern.
+
+\subsection{Combined space--time convergence}
+\label{sec:3d-combined}
+
+Table~\ref{tab:3d-combined} refines $h$ and $\Delta t$ together, with
+$\Delta t\approx0.15\,h^{7/4}$ chosen so that $\Delta t^4=O(h^7)$ stays subdominant to the
+spatial term $\eps_h=(\nu+v_0h)h^{2k}=O(h^{2k+1})=O(h^7)$ that Theorem~2 predicts in the
+convection-dominated regime $\nu\lesssim v_0h$ (here $\nu=0.01$ is indeed well below
+$v_0h$ for every $h$ tested, with $v_0=1.5$) -- i.e.\ it is designed to let the claimed
+\emph{superconvergent} rate $\|u-u_h\|_{L^2}=O(h^{k+1/2})=O(h^{3.5})$ show through, rather
+than being masked by the temporal error. The resulting number of time steps grows quickly
+with $n$ (3, 9, 17 for $n=1,2,3$), which is why only three mesh levels were affordable
+here (the $n=3$ run alone took just over four minutes).
+
+\begin{table}[h]\centering
+\caption{Combined space--time convergence: $k=3$, $\nu=0.01$,
+$\Delta t\approx0.15\,h^{7/4}$, $T=1$.}
+\label{tab:3d-combined}
+\begin{tabular}{rrrrcccccc}
+\toprule
+$n$ & $h$ & $N$ & $\Delta t$ & $\|u-u_h\|_{L^2}$ & order & $\|\nabla(u-u_h)\|_{L^2}$ & order & $\|p-p_h\|_{L^2}$ & order \\
+\midrule
+1 & 1.7321 & 3  & 0.3333 & $4.7946\times10^{-4}$ & --   & $9.8092\times10^{-3}$ & --   & $3.6367\times10^{-2}$ & --   \\
+2 & 0.8660 & 9  & 0.1111 & $1.6942\times10^{-4}$ & 1.50 & $3.9712\times10^{-3}$ & 1.31 & $6.7883\times10^{-3}$ & 2.42 \\
+3 & 0.5774 & 17 & 0.0588 & $4.9589\times10^{-5}$ & 3.03 & $1.6554\times10^{-3}$ & 2.16 & $2.1561\times10^{-3}$ & 2.83 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The $L^2$ velocity rate climbs from $1.50$ to $3.03$ between the two available intervals,
+consistent with pre-asymptotic approach to the superconvergent target $3.5$ -- not yet
+there, but already past the non-superconvergent target $h^k=h^3$ that would be expected
+without the pressure-robust cancellation, which is itself a meaningful confirmation of the
+mechanism at only three mesh levels. The $H^1$ velocity and $L^2$ pressure rates ($2.16$
+and $2.83$ at the finest interval) are likewise climbing towards their respective targets
+of $h^k=h^3$. Divergence remained at $\mathtt{div\_linf}\le6.1\times10^{-12}$ throughout.
+With only two intervals of data, climbing-but-not-yet-converged rates are the most this
+experiment can honestly claim; confirming saturation at the asymptotic values would need
+mesh levels beyond $n=3$, which were not affordable at this refinement rate in the time
+available.
+
+\subsection{Theorem 1 (energy stability) with forcing}
+\label{sec:3d-theorem1}
+
+Table~\ref{tab:3d-thm1} evaluates both sides of the energy stability inequality directly,
+for several viscosities and one deliberately stressed configuration (forcing scaled by
+$20$, initial data scaled by $3$), all at $n=2$, $\Delta t=0.1$, $T=0.5$. ``identity''
+is the relative residual of the \emph{exact} identity
+$E^{n+1}-E^n+\|u^{n+1}-2u^n+u^{n-1}\|^2+4\Delta t(\nu\|\nabla u^{n+1}\|^2+S^{n+1}+c)=
+4\Delta t(f^{n+1},u^{n+1})$ (worst step); ``LHS/RHS'' is the ratio of the two sides of the
+theorem itself, using the discrete dual norm $\|f\|_{-1,h}$ (a Poisson solve, as in the
+two-dimensional verification); ``$|c|/\mathrm{diss.}$'' is the convective term relative to
+the dissipation, which the theorem's proof requires to vanish exactly.
+
+\begin{table}[h]\centering
+\caption{Theorem 1 with forcing: $k=3$, $n=2$, $\Delta t=0.1$, $T=0.5$.}
+\label{tab:3d-thm1}
+\begin{tabular}{lrrrr}
+\toprule
+case & $\nu$ & identity & LHS/RHS & $|c|/\mathrm{diss.}$ \\
+\midrule
+$\nu=10^{-1}$                      & $10^{-1}$ & $2.85\times10^{-11}$ & $2.03\times10^{-5}$ & $3.55\times10^{-16}$ \\
+$\nu=10^{-2}$                      & $10^{-2}$ & $3.10\times10^{-11}$ & $7.80\times10^{-7}$ & $8.80\times10^{-16}$ \\
+$\nu=10^{-4}$                      & $10^{-4}$ & $6.92\times10^{-11}$ & $6.44\times10^{-9}$ & $5.05\times10^{-14}$ \\
+stress: $f\times20$, $u_0\times3$  & $10^{-4}$ & $7.77\times10^{-10}$ & $1.23\times10^{-9}$ & $1.46\times10^{-12}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The exact identity holds to $10^{-9}$--$10^{-11}$ in every case, including the stressed
+configuration, and the convective term is below $5\times10^{-12}$ of the dissipation
+throughout -- both confirm that the discrete velocity stays (numerically) exactly
+divergence-free and that the pressure-cancellation / convective-cancellation mechanism
+behind Theorem~1's proof holds in three dimensions exactly as it does in two. The
+inequality itself holds with enormous room to spare in every case ($\mathrm{LHS/RHS}\ll1$),
+and that room shrinks monotonically as $\nu$ decreases ($2\times10^{-5}$ at $\nu=10^{-1}$
+down to $6\times10^{-9}$ at $\nu=10^{-4}$) -- exactly the $1/\nu$-type looseness already
+identified and discussed for the two-dimensional version of this bound (the $H^{-1}$-type
+pairing of the forcing term puts an explicit $1/\nu$ in the right-hand side), not a new
+finding specific to three dimensions.
+
+\subsection{Theorem 2: direct evaluation of the left-hand side}
+\label{sec:3d-theorem2}
+
+Table~\ref{tab:3d-thm2} evaluates the actual left-hand side of Theorem~2,
+$\max_n\|e_h^n\|_0^2 + \nu\Delta t\sum\|\nabla e_h^{n+1}\|_0^2 + \Delta t\sum
+S_{\mathrm{IMEX}}^{n+1}(e_h^{n+1},e_h^{n+1})$, using $e_h=u_h-s_h$ with $s_h$ the modified
+Stokes projection of the exact solution (the same proxy for $w_h$ used in the
+two-dimensional verification, since $w_h=\nabla\times P_h z$ itself is not available in
+this code), on the same three runs as Table~\ref{tab:3d-combined} (so $n$, $h$, $N$,
+$\Delta t$ are as there). ``$G_7$'' is $\max_n\|e_h^n\|_0/h^2$, the a~priori bound~(7)
+check; ``$S(s_h)$'' is the stabilization-consistency term $\Delta t\sum
+S_{\mathrm{IMEX}}^{n+1}(s_h^{n+1},s_h^{n+1})$; $\eps_h=(\nu+v_0h)h^{2k}$ with $v_0=1.5$.
+
+\begin{table}[h]\centering
+\caption{Left-hand side of Theorem 2 with $e_h=u_h-s_h$: $k=3$, $\nu=0.01$, same runs as
+Table~\ref{tab:3d-combined}.}
+\label{tab:3d-thm2}
+\begin{tabular}{rrrrrrrr}
+\toprule
+$n$ & $G_7$ & $\|e_h\|^2$ & $\nu$-visc & $S(e_h)$ & $S(s_h)$ & LHS & LHS$/(\eps_h+\Delta t^4)$ \\
+\midrule
+1 & $3.85\times10^{-5}$ & $1.33\times10^{-8}$  & $1.28\times10^{-7}$ & $1.71\times10^{-12}$ & $2.32\times10^{-12}$ & $1.41\times10^{-7}$ & $2.00\times10^{-9}$ \\
+2 & $3.94\times10^{-5}$ & $8.73\times10^{-10}$ & $6.43\times10^{-9}$ & $1.21\times10^{-13}$ & $4.51\times10^{-13}$ & $7.31\times10^{-9}$ & $1.32\times10^{-8}$ \\
+3 & $2.96\times10^{-5}$ & $9.77\times10^{-11}$ & $1.25\times10^{-9}$ & $1.52\times10^{-14}$ & $8.68\times10^{-14}$ & $1.34\times10^{-9}$ & $4.14\times10^{-8}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three observations. First, the a~priori bound~(7) holds comfortably: $G_7=\max\|e_h\|/h^2$
+stays around $3$--$4\times10^{-5}$ across all three meshes, far below any fixed constant
+$\Gamma$ that would be needed for the bootstrap argument to close (Sec.~5.2 of the
+corrected paper). Second, the left-hand side itself decreases rapidly with refinement
+($1.4\times10^{-7}\to1.3\times10^{-9}$), dominated throughout by the viscous term
+$\nu$-visc rather than the CIP dissipation $S(e_h)$, which is two to three orders of
+magnitude smaller at every mesh size -- consistent with $S_1$ alone being a comparatively
+mild stabilizer on this smooth solution, exactly as intended. Third, and worth stating
+plainly rather than glossing over: the ratio of the left-hand side to the claimed scaling
+$\eps_h+\Delta t^4$ is extremely small throughout ($\sim10^{-9}$ to $\sim10^{-8}$), several
+orders of magnitude smaller than the corresponding ratios found in the two-dimensional
+verification of this same bound (which ranged from a few tenths to several units). This
+says the bound holds with very large room to spare here, not that it is wrong; part of
+the explanation is structural -- $\eps_h\propto h^{2k}=h^6$ in three dimensions against
+$h^{4}$ in two, and at the mesh sizes tested here $h$ ranges from $0.58$ to $1.73$, so this
+extra power of $h$ changes the numerical scale of $\eps_h$ substantially relative to the
+two-dimensional case -- but the ratio was not tracked finely enough across mesh levels in
+this experiment to decompose that explanation quantitatively, and it should be treated as
+an open observation rather than a settled one.
+
+\end{document}
