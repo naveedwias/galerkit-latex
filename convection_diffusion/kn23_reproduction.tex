@@ -1,0 +1,235 @@
+% Reproduction of Knobloch, Numer. Algorithms 94 (2023) 1229-1267, with galerkit.
+% Tables and figures: galerkit examples/convection_diffusion/2d/afc_kn23/make_report.py --dest <this folder>
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{framed}
+\usepackage[section]{placeins}
+\usepackage[colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
+
+\newcommand{\mism}[1]{\textcolor{orange!85!black}{#1}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\bb}{\boldsymbol{b}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\yes}{\checkmark}
+
+\title{The SMUAS method of Knobloch (Numer.\ Algorithms 2023):\\ implementation check, algorithm and reproduction of the numerical results}
+\author{galerkit}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+P.~Knobloch, \emph{An algebraically stabilized method for convection--diffusion--reaction problems with optimal
+experimental convergence rates on general meshes}, Numer.\ Algorithms 94 (2023)~\cite{Kn23}, analyses why algebraic
+stabilizations lose accuracy on meshes without local symmetry and proposes the Symmetrized Monotone Upwind-type
+Algebraically Stabilized (SMUAS) method. We check that galerkit implements all four methods of the paper (the AFC
+schemes with the Kuzmin and the BJK limiter, MUAS and SMUAS) together with the limiter variants used in its analysis,
+state the SMUAS method as an algorithm, and recompute the paper's numerical results: Tables~1--9, the statements of
+Sections~5 and~6, and Figures~3, 4, 5, 7, 8, 9, 11 and~13. \input{tables/kn23_abstract.tex}
+\end{abstract}
+
+\tableofcontents
+
+%=====================================================================================================
+\section{Is the method implemented?}\label{sec:impl}
+%=====================================================================================================
+
+\begin{table}[!htbp]
+\centering\small\setlength{\tabcolsep}{4pt}
+\caption{What~\cite{Kn23} uses and where it is in galerkit (\texttt{src/galerkit/convection\_diffusion}).
+``new'' marks what was added for this reproduction.}\label{tab:kn23-impl}
+\begin{tabular}{p{6.2cm}p{8.6cm}}
+\toprule
+item of the paper & galerkit\\
+\midrule
+AFC, Kuzmin limiter (19)--(23), $R_i^\pm=1$ at Dirichlet nodes & \texttt{stab="afc\_kuzmin"} (limiter \texttt{"kuzmin"})\\
+AFC, BJK limiter (25)--(28) with $a_{ji}:=0$ at Dirichlet nodes & \texttt{stab="afc"}, $\mu_i$ = \texttt{afc\_gamma} (a number, or \texttt{"bjk"} for (30))\\
+MUAS (31)--(36) & \texttt{stab="muas"}\\
+SMUAS (60)--(64) with (67) or (68) & \texttt{stab="smuas"}, \texttt{smuas\_weights="67"|"68"}\\
+Kuzmin with $P_i^\pm$ from (25) (Fig.~7, right) & new: \texttt{AFCOperator(kuzmin\_p="25")}\\
+$R_i^\pm=\min\{1,\mu_iQ_i^\pm/P_i^\pm\}$, (27), (47), (48) & new: \texttt{AFCOperator(r\_mu=}scalar or per node\texttt{)}\\
+Example 1 & \texttt{bjk\_polynomial}\\
+Examples 2--5 & new: \texttt{kn23\_ex2}, \dots, \texttt{kn23\_ex5} (Ex.~3 in an overflow-free form)\\
+Grids 1, 4, 5; 6, 7, 8 & \texttt{rectangle\_mesh} (\texttt{right}, \texttt{rows}, \texttt{left}, \texttt{alternating}, \texttt{crossed}), \texttt{distorted\_rows\_mesh}\\
+Grids 2, 3 & from the BJK16 reproduction (Grid~3 read from the vector figure of~\cite{BJK16})\\
+Grid 9 & new: \texttt{kn23\_grids.grid9}\\
+Table 9 grid (shift $1.5h$, last node $0.75h$) & new: \texttt{distorted\_rows\_mesh(last\_shift=0.75)}\\
+Table 10: triangulated FVCA5 \texttt{mesh4\_1} family & \emph{not available} (see Section~\ref{sec:disc})\\
+nonlinear solver ``fixed point rhs'' (Remark 5) & \texttt{afc\_solver="fp\_rhs"}; also \texttt{"newton"}, \texttt{"fp\_anderson"}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Answer: yes.} All four methods of the paper were already implemented in galerkit, and Tables~1, 2, 4, 5
+(first row) and~8 had been checked before. The SMUAS implementation (\texttt{src/galerkit/convection\_diffusion/afc.py}, limiter \texttt{"smuas"}) was checked
+line by line against (61)--(68) of~\cite{Kn23}: the sums in $P_i^\pm$ run over $j\in S_i$ with $a_{ij}>0$ or
+$a_{ji}>0$ and those in $Q_i^\pm$ over all $j\in S_i$; the reflected values are $u_{ij}=u_i+\nabla u_h|_{T_{ij}}\cdot
+(x_i-x_j)$ with $T_{ij}$ the simplex of the patch entered by the half line $x_i+t(x_i-x_j)$, $t>0$; $R_i^\pm=1$ at
+Dirichlet nodes and where $P_i^\pm=0$; $\beta_{ij}$ and $b_{ij}$ follow (36), (31), (32). For this reproduction we
+added the limiter variants studied in Section~5 of the paper ($P_i^\pm$ from (25) for the Kuzmin limiter, and the
+factor $\mu_i$ of (27)/(47) in $R_i^\pm$), Examples~2--5, Grids~6--9 and the grid of Table~9.
+
+%=====================================================================================================
+\section{The SMUAS algorithm}\label{sec:alg}
+%=====================================================================================================
+
+\paragraph{Setting.} $P_1$ elements on a simplicial triangulation of $\Omega\subset\R^d$, nodes $x_1,\dots,x_N$ with
+$x_{M+1},\dots,x_N$ on $\partial\Omega$, $S_i$ the neighbours of $x_i$, $\Delta_i$ the patch of $x_i$, and
+$A=(a_{ij})$ the Galerkin matrix of $-\eps\Delta u+\bb\cdot\nabla u+cu=g$, $a_{ij}=a(\varphi_j,\varphi_i)$. The method
+solves
+\begin{equation}\label{eq:alg}
+  \sum_{j=1}^N\bigl(a_{ij}+b_{ij}(U)\bigr)u_j=g_i,\quad i\le M,\qquad u_i=u_b(x_i),\quad i>M,
+\end{equation}
+with the symmetric, row-sum-free stabilization matrix
+$b_{ij}(U)=-\max\{\beta_{ij}(U)a_{ij},0,\beta_{ji}(U)a_{ji}\}$ ($i\ne j$), $b_{ii}=-\sum_{j\ne i}b_{ij}$.
+
+\begin{framed}
+\noindent\textbf{Algorithm SMUAS.}\quad\emph{Input:} $A$, $g$, $u_b$, the mesh, the choice (67) or (68) of the weights,
+a tolerance $\tau$. \emph{Output:} $U$ solving \eqref{eq:alg}.
+
+\smallskip\noindent\textbf{Set-up} (once per mesh).
+\begin{enumerate}[label=S\arabic*., leftmargin=*, itemsep=2pt]
+\item For every interior node $i$ and every $j\in S_i$: find the simplex $T_{ij}\subset\Delta_i$ entered by the half
+  line $\{x_i+t(x_i-x_j):t>0\}$ (the simplex whose barycentric gradients satisfy
+  $\nabla\lambda_k\cdot(x_i-x_j)\ge0$ for all its vertices $x_k\ne x_i$). Store the row
+  $w_{ij}=e_i+\sum_{x_k\in T_{ij}}(\nabla\lambda_k\cdot(x_i-x_j))\,e_k$, so that the reflected value is
+  $u_{ij}=w_{ij}\cdot U=u_i+\nabla u_h|_{T_{ij}}\cdot(x_i-x_j)$ \hfill(60)
+\item Weights, (67): $p_{ij}=\max\{a_{ij},0,a_{ji}\}$, $q_{ij}=\max\{|a_{ij}|,a_{ji}\}$; or (68): $p_{ij}=q_{ij}=1$.
+  Set $p_{ij}=0$ unless $a_{ij}>0$ or $a_{ji}>0$.
+\end{enumerate}
+
+\noindent\textbf{Stabilization matrix} $B(U)$ for a given $U$.
+\begin{enumerate}[label=B\arabic*., leftmargin=*, itemsep=2pt]
+\item For $i\le M$ and $j\in S_i$: $\delta_{ij}=u_i-u_j$ and $r_{ij}=u_i-u_{ij}$.
+\item $P_i^\pm=\sum_{j\in S_i}p_{ij}\{(\delta_{ij})^\pm+(r_{ij})^\pm\}$,\quad
+  $Q_i^\pm=\sum_{j\in S_i}q_{ij}\{(-\delta_{ij})^\pm+(-r_{ij})^\pm\}$ \hfill(61)--(64)\\
+  with $z^+=\max\{0,z\}$, $z^-=\min\{0,z\}$.
+\item $R_i^\pm=\min\{1,Q_i^\pm/P_i^\pm\}$, and $R_i^\pm=1$ if $P_i^\pm=0$ or $i>M$. \hfill(20), (21)
+\item $\beta_{ij}=1-R_i^+$ if $u_i>u_j$, $\beta_{ij}=1-R_i^-$ if $u_i<u_j$, $\beta_{ij}=0$ if $u_i=u_j$. \hfill(36)
+\item $b_{ij}=-\max\{\beta_{ij}a_{ij},0,\beta_{ji}a_{ji}\}$ for every edge, $b_{ii}=-\sum_{j\neq i}b_{ij}$. \hfill(31), (32)
+\end{enumerate}
+
+\noindent\textbf{Nonlinear solve.} Let $D$ be $B$ with all $\beta_{ij}=1$, i.e.\ $d_{ij}=-\max\{a_{ij},0,a_{ji}\}$.
+\begin{enumerate}[label=N\arabic*., leftmargin=*, itemsep=2pt]
+\item $U^0$: solve $(A+D)U^0=g$ (with the Dirichlet values), the monotone low-order solution.
+\item For $k=0,1,\dots$: compute $B(U^k)$ by B1--B5 and the residual
+  $r^k=g-(A+B(U^k))U^k$ on the free nodes; stop if $\|r^k\|_2\le\tau$.
+\item \emph{Fixed point rhs} (used in~\cite{Kn23}, Remark~5): solve $(A+D)\tilde U=g-(B(U^k)-D)U^k$ with the factorization
+  of $A+D$ from N1, and set $U^{k+1}=U^k+\omega_k(\tilde U-U^k)$ with a damping $\omega_k\in(0,1]$; or
+  \emph{semismooth Newton}: $U^{k+1}=U^k-\lambda_k J(U^k)^{-1}r^k$ with the generalized Jacobian of the piecewise
+  smooth map $U\mapsto(A+B(U))U$ and an Armijo step $\lambda_k$.
+\end{enumerate}
+\end{framed}
+
+\paragraph{Properties} (proved in~\cite{Kn23} for arbitrary simplicial meshes). (A1) and hence existence of a
+solution (Theorem~4), the local DMP via (A2) (Theorem~5), and linearity preservation (Remark~2: for $u_h\in P_1(\R^d)$ one has $r_{ij}=-\delta_{ij}$, hence
+$P_i^+=-P_i^-=\sum_j p_{ij}|u_i-u_j|\le\sum_j q_{ij}|u_i-u_j|=Q_i^+=-Q_i^-$ by $p_{ij}\le q_{ij}$, so $R_i^\pm=1$ and
+$B(U)=0$).
+The cost per evaluation of $B(U)$ is one sparse product $WU$ (the reflected values) plus edge loops, i.e.\ linear in
+the number of edges; the set-up S1 is a single pass over the patches.
+
+\paragraph{Implementation in galerkit.} S1 is \texttt{reflection\_operator} (a sparse matrix $W$ with one row per
+directed edge); B1--B5 are \texttt{AFCOperator.b\_edges}; N1--N3 are \texttt{solve\_afc} with
+\texttt{afc\_solver="fp\_rhs"}, \texttt{"fp\_anderson"} (with Anderson acceleration), or \texttt{"newton"}, the
+latter with the exact generalized Jacobian of SMUAS (\texttt{\_jacobian\_muas}).
+
+%=====================================================================================================
+\section{Set-up of the computations}\label{sec:setup}
+%=====================================================================================================
+
+\begin{itemize}[leftmargin=*]
+\item $P_1$ elements, no lumping of the reaction term (in contrast to~\cite{BJK16}), $\varepsilon$ as stated.
+\item $ne$ is the number of edges on the part of $\partial\Omega$ on $y=1$: Grids 1, 4--8 have $ne\times ne$ squares;
+  Grid~2 has $ne=2$ and Grid~3 $ne=4$ on level~0 and is refined uniformly, so that grids with the same $ne$ have
+  similar numbers of triangles; Grid~9 is built for each $ne$.
+\item Error norm $\|v\|_h^2=\varepsilon|v|_1^2+\sigma_0\|v\|_0^2+b_h(u_h;v,v)$ with $v=u-u_h$, the last term
+  evaluated at $i_hu-u_h$, and $\sigma_0=1$. For Example~2, where $c=0$, the paper's Table~3 is reproduced only with
+  $\sigma_0=1$, i.e.\ the $L^2$ term is kept although $\sigma_0=0$ there: $\sqrt{\varepsilon|e|_1^2+b_h}=8.560\cdot10^{-3}$
+  against the printed $1.179\cdot10^{-2}=\sqrt{(8.560\cdot10^{-3})^2+\|e\|_0^2}$ for $ne=16$.
+\item Nonlinear solver: semismooth Newton with the exact generalized Jacobian (Kuzmin, MUAS, SMUAS) or with coloured
+  finite differences (the variants), stopped at a Euclidean residual of $10^{-10}$; where Newton is slow, the
+  Anderson-accelerated fixed point rhs. The paper used fixed point rhs; the values do not depend on the solver once
+  the residual is small.
+\item ``Odd horizontal grid lines'' in (47), (48) are counted from $y=0$ as line~1, i.e.\ $y=0,2h,4h,\dots$: with
+  $\mu$ on these lines Example~2 is solved exactly, with $\mu$ on the other lines it is not (error $2.5\cdot10^{-2}$).
+\end{itemize}
+
+%=====================================================================================================
+\section{Tables}\label{sec:tables}
+%=====================================================================================================
+
+\input{tables/kn23_summary.tex}
+\input{tables/kn23_tables.tex}
+
+%=====================================================================================================
+\section{The statements of Sections 5 and 6}\label{sec:checks}
+%=====================================================================================================
+
+\input{tables/kn23_checks.tex}
+
+%=====================================================================================================
+\section{Figures}\label{sec:figs}
+%=====================================================================================================
+
+All figures are wire frames of $u_h$ along the grid lines parallel to the axes, as in the paper; they are
+qualitative and agree with the paper in every feature described there.
+
+\begin{figure}[!htbp]\centering
+\includegraphics[width=0.75\textwidth]{figures/kn23_fig3.pdf}
+\caption{(Fig.~3 of~\cite{Kn23}) Example~1, $\varepsilon=10^{-8}$, Kuzmin, Grid~4, $ne=32$: $u_h$ and $u_h-i_hu$.}\end{figure}
+\begin{figure}[!htbp]\centering
+\includegraphics[width=\textwidth]{figures/kn23_fig4.pdf}
+\caption{(Fig.~4) $u_h-i_hu$ along $x=0.25$, $ne=32,64,128$. The amplitudes ($\approx0.02$, $0.007$, $0.003$)
+match the vertical scales of the paper's figure.}\end{figure}
+\begin{figure}[!htbp]\centering
+\includegraphics[width=0.75\textwidth]{figures/kn23_fig5.pdf}
+\caption{(Fig.~5) Kuzmin, Grid~4, $ne=20$: Example~2, and Example~3 with (47), (48).}\end{figure}
+\begin{figure}[!htbp]\centering
+\includegraphics[width=\textwidth]{figures/kn23_fig7.pdf}
+\caption{(Fig.~7) Kuzmin, Grid~1, $ne=10$: Example~3; Example~3 with $\mu_i=2$ in (27); Example~4; Example~4 with
+$P_i^\pm$ from (25).}\end{figure}
+\begin{figure}[!htbp]\centering
+\includegraphics[width=0.75\textwidth]{figures/kn23_fig8.pdf}
+\caption{(Fig.~8) Example~4, BJK limiter, Grid~1, $ne=10$, $\mu_i=1$ and $\mu_i=2$.}\end{figure}
+\begin{figure}[!htbp]\centering
+\includegraphics[width=\textwidth]{figures/kn23_fig9.pdf}
+\caption{(Fig.~9) Example~5, Kuzmin, $ne=20$, Grids~1 and~4; the third panel (not in the paper) shows $u_h-u$ on
+Grid~4, where the oscillation is clearer than in the solution itself.}\end{figure}
+\begin{figure}[!htbp]\centering
+\includegraphics[width=0.75\textwidth]{figures/kn23_fig11.pdf}
+\caption{(Fig.~11) Example~1, $\varepsilon=10^{-8}$, SMUAS (68), Grid~4, $ne=32$ and $64$; compare Fig.~3.}\end{figure}
+\begin{figure}[!htbp]\centering
+\includegraphics[width=0.75\textwidth]{figures/kn23_fig13.pdf}
+\caption{(Fig.~13) SMUAS (67), Grid~4, $ne=20$: Examples~4 and~5.}\end{figure}
+
+%=====================================================================================================
+\section{Discussion}\label{sec:disc}
+%=====================================================================================================
+
+\input{tables/kn23_discussion.tex}
+
+\begin{thebibliography}{9}
+\bibitem{Kn23} P.~Knobloch, An algebraically stabilized method for convection--diffusion--reaction problems with
+  optimal experimental convergence rates on general meshes, \emph{Numer.\ Algorithms} 94 (2023) 1229--1267.
+  \url{https://doi.org/10.1007/s11075-023-01511-2}
+\bibitem{BJK16} G.\,R.~Barrenechea, V.~John, P.~Knobloch, Analysis of algebraic flux correction schemes,
+  \emph{SIAM J.\ Numer.\ Anal.} 54 (2016) 2427--2451.
+\bibitem{BJK17} G.\,R.~Barrenechea, V.~John, P.~Knobloch, An algebraic flux correction scheme satisfying the discrete
+  maximum principle and linearity preservation on general meshes, \emph{Math.\ Models Methods Appl.\ Sci.} 27 (2017)
+  525--548.
+\bibitem{JK22} V.~John, P.~Knobloch, On algebraically stabilized schemes for convection--diffusion--reaction problems,
+  \emph{Numer.\ Math.} 152 (2022) 553--585.
+\end{thebibliography}
+
+\end{document}
