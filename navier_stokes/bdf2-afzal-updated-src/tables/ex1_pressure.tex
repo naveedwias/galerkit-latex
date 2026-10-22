@@ -1,0 +1,13 @@
+% filled 2026-10-20 from tg.tar: Taylor-Green pressure study, n=32, nu=1e-6, k=2, baseline R=0
+\begin{tabular}{lcccc}
+\toprule
+Method & $R=10^2$ & $R=10^4$ & $R=10^6$ & $\|u-u_h\|_0$, $R=0\to10^6$ \\
+\midrule
+SV, Galerkin & 6.06e-9 & 2.30e-7 & 1.16e-5 & 1.53e-3 for all $R$ \\
+SV, CIP & 6.87e-9 & 1.08e-6 & 5.31e-6 & 3.11e-4 for all $R$ \\
+TH, Galerkin & -- & -- & -- & 8.77e-3 at $R=0$ \\
+TH, CIP & 1.84 & 13.0 & -- & 1.99e-3 to 4.03 \\
+TH, grad-div & 0.547 & 7.11 & -- & 1.42e-3 to 1.87 \\
+TH, CIP + grad-div & 0.144 & 2.40 & 2.56e2 & 6.57e-4 to 105 \\
+\bottomrule
+\end{tabular}

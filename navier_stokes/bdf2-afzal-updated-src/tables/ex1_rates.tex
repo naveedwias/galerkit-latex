@@ -1,0 +1,21 @@
+% filled 2026-10-20 from tg.tar (Afzal setting: T=0.5, nu=1e-6, dt=5e-3 fixed): Taylor-Green rates, SV with CIP
+% k=3 runs outstanding -- rows left open.
+% k=2, n=64 row: cip study, S1+S2+S3, s=1 -- same scheme/weights; its n=32 record is
+% bit-identical to the rates-study n=32 record (all error fields), so this continues the sequence.
+\begin{tabular}{rrcccccc}
+\toprule
+$k$ & $n$ & $\Delta t$ & $\|u-u_h\|_0$ & $|u-u_h|_1$ & Stab. & $\|p-p_h\|_{\ell^2(L^2)}$ & same, $n\ge2$ \\
+\midrule
+2 & 4 & 5.00e-3 & 8.14e-2 & 2.11 & 0.514 & 2.23e-1 & 2.22e-1 \\
+2 & 8 & 5.00e-3 & 1.44e-2 (2.50) & 0.730 (1.53) & 8.32e-2 (2.63) & 2.52e-2 (3.14) & 2.51e-2 (3.14) \\
+2 & 16 & 5.00e-3 & 2.22e-3 (2.69) & 0.164 (2.15) & 1.44e-2 (2.53) & 3.47e-3 (2.86) & 3.45e-3 (2.86) \\
+2 & 32 & 5.00e-3 & 3.11e-4 (2.84) & 3.54e-2 (2.21) & 2.58e-3 (2.49) & 5.27e-4 (2.72) & 5.24e-4 (2.72) \\
+2 & 64 & 5.00e-3 & 4.14e-5 (2.91) & 8.45e-3 (2.07) & 4.57e-4 (2.50) & 9.10e-5 (2.53) & 9.06e-5 (2.53) \\
+\midrule
+3 & 4 & \torun{--} & \torun{--} & \torun{--} & \torun{--} & \torun{--} & \torun{--} \\
+3 & 8 & \torun{--} & \torun{--} & \torun{--} & \torun{--} & \torun{--} & \torun{--} \\
+3 & 16 & \torun{--} & \torun{--} & \torun{--} & \torun{--} & \torun{--} & \torun{--} \\
+3 & 32 & \torun{--} & \torun{--} & \torun{--} & \torun{--} & \torun{--} & \torun{--} \\
+3 & 64 & \torun{--} & \torun{--} & \torun{--} & \torun{--} & \torun{--} & \torun{--} \\
+\bottomrule
+\end{tabular}

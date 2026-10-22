@@ -1,0 +1,49 @@
+% Response to the referees: Section 5 (numerical studies). Paste into the response letter.
+% Numbers marked [..] are filled in after the remaining computations.
+
+\paragraph{Section 5 has been restructured.}
+We have rebuilt the numerical section around a new test problem, Example~1 (Section~5.1): a
+manufactured solution with no-slip walls,
+$u=\nabla\times\bigl(\sin^2(\pi x)\sin^2(\pi y)\,(1+\tfrac12\sin2\pi t)\bigr)$,
+$p=R\sin(2\pi x)\sin(2\pi y)$ on the unit square. Unlike the periodic problems of the submitted
+version, it satisfies all hypotheses of Theorems~2 and~3: the no-slip condition, the lower
+bound of Assumption~1, and regularity independent of $\nu$. It is therefore a direct test of
+the analysis, and we use it for every quantitative question the referees raised:
+\begin{itemize}
+\item spatial rates for $k=2$ and $k=3$ at $\nu=10^{-8}$, including the stabilization term of
+      Theorem~2 and the discrete $\ell^2(L^2)$ pressure error, with orders for every mesh pair
+      (Table~1);
+\item a comparison of Scott--Vogelius and Taylor--Hood, each with Galerkin and CIP, and Taylor--Hood
+      with grad-div alone and with CIP (Table~2, Figure~1), which replaces the former table for the
+      two-dimensional vortex;
+\item convergence in time for all six discretizations (Table~3, Figure~2);
+\item the $\nu$-sweep from $10^{-1}$ to $10^{-9}$ (Figure~3) and the pressure-robustness test with
+      $R$ up to $10^6$ (Table~4);
+\item the role of the three CIP terms (E4), now as a mesh sequence, so that the convergence order
+      with $S_1$ alone can be compared with that of the full stabilization; we also run the full
+      form with $\delta_3=\delta_1$, because with $\delta_3=10^{-3}$ the third term is much weaker than
+      the other two, and report the measured sizes of the three terms to check the geometric
+      scaling of the $\delta_j$ (Tables~5 and~6);
+\item the time-step restriction (E5) for the original, one-sided and clamped normalizations
+      (Table~7), and a cost comparison at equal numbers of unknowns and equal run time (E6, Table~8,
+      Figure~4).
+\end{itemize}
+The two-dimensional travelling vortex has been removed. Its role, a smooth solution for rates,
+temporal convergence and pressure robustness, is now taken by Example~1, which, unlike the
+periodic vortex, lies within the scope of the theorems. The referees asked for (E4)--(E6) on the
+vortex; we carried them out on Example~1 instead, for the same reason. The vortex results were
+consistent with those reported here: SV with CIP was pressure robust to the solver tolerance,
+$S_3$ had no visible effect, no time-step restriction appeared up to $\Delta t=4h$, and TH with CIP
+and grad-div was more accurate per degree of freedom on that smooth problem with a small pressure.
+The code for both problems is available in the accompanying repository. The three-dimensional
+vortex (Section~5.2), computed with a variant of the scheme, and the double shear layer
+(Section~5.3), which now includes results on $n=32$, are kept.
+
+\paragraph{Details made explicit in the text.}
+(i) The gradient part of the body force is assembled as $-(p,\nabla\cdot v_h)$, which vanishes
+for divergence-free test functions; integrating $(\nabla p,v_h)$ by quadrature would perturb the
+SV velocity by the quadrature error. (ii) All computations use the normalization
+$\max(10^{-2},\|\tilde u_h^{n+1}\|_{0,\infty})^{-1}$ discussed after (7). (iii) The time steps are stated
+for every example; the shear layer uses a CFL step. (iv) The pressure error also is given without
+the IMEX--Euler starting step, whose contribution is $O(\Delta t^{3/2})$. (v) All figures have been
+redrawn at print size with fonts of 8--9\,pt.

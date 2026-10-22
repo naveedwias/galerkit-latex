@@ -1,0 +1,13 @@
+% filled 2026-10-20 from tg.tar: Taylor-Green methods study, k=2, nu=1e-6, n=32 (orders from n=16)
+\begin{tabular}{lrccccr}
+\toprule
+Method & $N_{\rm dof}$ & $\|u-u_h\|_0$ & $|u-u_h|_1$ & $\|p-p_h\|_0$ & $\|\nabla\cdot u_h\|_0$ & s/step \\
+\midrule
+SV, Galerkin & 49\,280 & 1.53e-3 (1.99) & 0.789 (1.14) & 9.45e-4 (2.06) & 7e-14 & 3.38 \\
+SV, CIP & 49\,280 & 3.11e-4 (2.84) & 3.54e-2 (2.21) & 7.45e-4 (2.72) & 7e-14 & 8.09 \\
+TH, Galerkin & 16\,512 & 8.77e-3 (2.07) & 3.06 (1.00) & 2.07e-3 (2.20) & 1.9 & 0.549 \\
+TH, CIP & 16\,512 & 1.99e-3 (2.14) & 0.536 (1.09) & 1.61e-3 (2.10) & 0.52 & 2.00 \\
+TH, grad-div & 16\,512 & 1.42e-3 (1.78) & 0.247 (0.94) & 1.13e-3 (2.03) & 1.0e-2 & 0.409 \\
+TH, CIP + grad-div & 16\,512 & 6.57e-4 (2.45) & 5.55e-2 (1.73) & 1.13e-3 (2.05) & 8.2e-3 & 2.14 \\
+\bottomrule
+\end{tabular}

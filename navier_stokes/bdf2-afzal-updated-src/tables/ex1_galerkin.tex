@@ -1,0 +1,16 @@
+% filled 2026-10-20 from tg.tar: Taylor-Green methods study, unstabilized (Galerkin) runs, k=2, nu=1e-6, all meshes
+\begin{tabular}{lrcccc}
+\toprule
+Method & $n$ & $\|u-u_h\|_0$ & $|u-u_h|_1$ & $\|p-p_h\|_0$ & $\|\nabla\cdot u_h\|_0$ \\
+\midrule
+SV, Galerkin & 8 & 2.25e-2 & 3.26 & 1.32e-2 & 2e-14 \\
+SV, Galerkin & 16 & 6.07e-3 (1.89) & 1.74 (0.90) & 3.95e-3 (1.74) & 4e-14 \\
+SV, Galerkin & 32 & 1.53e-3 (1.99) & 0.789 (1.14) & 9.45e-4 (2.06) & 7e-14 \\
+SV, Galerkin & 64 & 3.44e-4 (2.16) & 0.298 (1.41) & 2.04e-4 (2.21) & 2e-13 \\
+\midrule
+TH, Galerkin & 8 & 1.47e-1 & 11.5 & 4.81e-2 & 7.6 \\
+TH, Galerkin & 16 & 3.69e-2 (2.00) & 6.13 (0.90) & 9.55e-3 (2.33) & 3.8 \\
+TH, Galerkin & 32 & 8.77e-3 (2.07) & 3.06 (1.00) & 2.07e-3 (2.20) & 1.9 \\
+TH, Galerkin & 64 & 1.91e-3 (2.20) & 1.40 (1.13) & 4.89e-4 (2.08) & 0.92 \\
+\bottomrule
+\end{tabular}
