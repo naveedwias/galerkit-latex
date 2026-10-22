@@ -217,7 +217,36 @@ Grid~4, where the oscillation is clearer than in the solution itself.}\end{figur
 \section{Discussion}\label{sec:disc}
 %=====================================================================================================
 
-\input{tables/kn23_discussion.tex}
+\paragraph{Agreement.} Table~S shows the agreement for every recomputed table; together with the checks of
+Section~\ref{sec:checks} and the figures, every numerical statement of~\cite{Kn23} that does not depend on the
+FVCA5 meshes is reproduced. Three points of the set-up had to be inferred and are now fixed by the data: the
+$\sigma_0=1$ in $\|\cdot\|_h$ also for $c=0$ (Table~3), the counting of the ``odd horizontal grid lines'' in
+(47), (48), and the use of the (exact, recovered) Grids~2 and~3 of~\cite{BJK16}.
+
+\paragraph{One nuance.} For Example~3 on Grid~4 the paper states that SMUAS is nodally exact except on the last
+interior vertical grid line. This holds for the weights (68). With (67) the computed solution (residual
+$4\cdot10^{-11}$) also has an error of about $10^{-3}$ on the second-last line; the paper does not say which weights it
+used for this statement, and its remark that (67) and (68) give ``similar'' results remains true in the norms.
+
+\paragraph{Table 10 not recomputed.} Table~10 uses a triangulated version of the \texttt{mesh4\_1} family of the
+FVCA5 benchmark. The meshes are distributed only by the benchmark web site, which this environment cannot reach,
+and only the coarsest of the six meshes is drawn in the paper (Fig.~12, right); the finer meshes cannot be
+inferred from it. The run script reads any mesh as a \texttt{SimplexMesh}, so Table~10 can be added as soon as the
+files are available.
+
+\paragraph{Solvers.} The nonlinear problems were solved by semismooth Newton (Kuzmin, MUAS, SMUAS: exact generalized
+Jacobian), 7--60 iterations up to $ne=512$; for the Kuzmin limiter on Grid~4 at $ne=512$ the Anderson-accelerated
+fixed point rhs was used, as Newton becomes slow there (cf.\ the BJK16 reproduction). The SMUAS problems were
+never harder to solve than the Kuzmin ones, in line with Remark~5 of the paper.
+
+\paragraph{Minimality and the sharper track.} The SMUAS properties used here are exactly those of Table~11 of the
+paper: DMP on arbitrary simplicial meshes (via (A2), which needs only $p_{ij}>0$ for $a_{ij}>0$, (66)), linearity
+preservation (which needs only $p_{ij}\le q_{ij}$, (65)), upwind character (the $\max\{\beta_{ij}a_{ij},0,\beta_{ji}a_{ji}\}$
+form (31)), and the observed optimal rates. The last property is experimental: no a~priori estimate better than
+the $O(h^{1/2})$ of (16) is proved for SMUAS, and the reproduced Tables~4--9 are the evidence. A proof of
+optimal-order convergence on general meshes (the open problem stated at the end of~\cite{Kn23}) would be the
+sharper result; the linearity-preserving BJK limiter~\cite{BJK17} has the DMP and linearity preservation as well but
+not the upwind character, and its nonlinear problems are much harder to solve.
 
 \begin{thebibliography}{9}
 \bibitem{Kn23} P.~Knobloch, An algebraically stabilized method for convection--diffusion--reaction problems with
