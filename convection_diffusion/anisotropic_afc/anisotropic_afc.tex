@@ -1,0 +1,216 @@
+% Algebraic stabilizations on anisotropic (layer-adapted) meshes.
+% Tables and figures: galerkit examples/convection_diffusion/2d/anisotropic_afc/make_report.py (branch feature/anisotropic-afc)
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage[section]{placeins}
+\usepackage[colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
+
+\newcommand{\mism}[1]{\textcolor{orange!85!black}{#1}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\bb}{\boldsymbol{b}}
+
+\title{Algebraic stabilizations on anisotropic meshes:\\ accuracy, nonlinear solvers and the DMP mesh conditions}
+\author{galerkit}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+For convection--diffusion problems whose layers are known in advance, layer-adapted meshes such as Shishkin meshes
+use cells that are small across the layer and long along it. We study the eight algebraic stabilizations of galerkit
+(AFC with the BJK, Kuzmin and monotone convex limiters, MUAS, SMUAS, BBK, F-BBK, S-BBK) on uniform and Shishkin meshes
+with aspect ratios up to $6\cdot10^7$, for three problems with exponential and parabolic layers and
+$\eps=10^{-4},10^{-8}$: 638 runs. Shishkin meshes resolve the layers and reduce the $L^2$ error by up to four orders of
+magnitude for all methods. On these meshes, however, the Galerkin method is already stable, and the algebraic
+stabilization costs accuracy: for a problem with layers in both directions its errors are 5--40 times larger than
+those of Galerkin and SUPG, with first-order convergence away from the layers. The nonlinear problems become harder:
+the iteration numbers of the fixed point rhs grow with the anisotropy, and 62 of the 510 runs did not converge with any
+of three solvers. The DMP mesh conditions of the Kuzmin, MC and F-/S-BBK methods hold on Shishkin meshes split into two
+right triangles per cell and fail on the non-Delaunay crossed splitting; no DMP violation was observed even there.
+\end{abstract}
+
+\tableofcontents
+
+%=====================================================================================================
+\section{Questions}
+%=====================================================================================================
+
+If the position of the layers is known, it makes sense to use mesh cells that are small in the direction of the
+convection (across an exponential layer) and large orthogonal to it; Shishkin meshes are the standard example. For the
+algebraic stabilizations we ask:
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Accuracy} of the solutions on such meshes, compared with uniform meshes and with Galerkin and SUPG.
+\item \textbf{Efficiency}: the number of iterations needed to solve the nonlinear problem.
+\item \textbf{DMP}: some methods satisfy the discrete maximum principle on all simplicial meshes, others only under a
+  mesh condition. Are these conditions satisfied on anisotropic meshes, and is the DMP violated where they are not?
+\end{enumerate}
+
+%=====================================================================================================
+\section{Set-up}
+%=====================================================================================================
+
+\paragraph{Methods.} $P_1$ elements, $\sum_j(a_{ij}+b_{ij}(u))u_j=g_i$ with the Galerkin matrix $A$ and a symmetric
+stabilization matrix $B(u)$; the reaction term is not lumped.
+\begin{center}\small
+\begin{tabular}{lll}
+\toprule
+method & galerkit & sufficient DMP condition (\texttt{dmp\_certificate})\\
+\midrule
+AFC, BJK limiter & \texttt{afc} & none (any simplicial mesh)\\
+MUAS, SMUAS & \texttt{muas}, \texttt{smuas} & none\\
+BBK & \texttt{bbk} & none\\
+AFC, Kuzmin limiter & \texttt{afc\_kuzmin} & $\min\{a_{ij},a_{ji}\}\le0$ on every edge with a free node\\
+AFC, monotone convex limiter & \texttt{afc\_mc} & Delaunay type (Kuzmin condition checked as a proxy)\\
+F-BBK, S-BBK & \texttt{fbbk}, \texttt{sbbk} & $\max\{a_{ij},a_{ji}\}\le\tau_E=C_0|E|$\\
+\bottomrule
+\end{tabular}
+\end{center}
+SUPG and the Galerkin method serve as references.
+
+\paragraph{Problems} (layers known), on $\Omega=(0,1)^2$:
+\begin{itemize}[leftmargin=*]
+\item \texttt{exp\_layer}: $\bb=(1,0)$, $c=f=0$, $u=(1-e^{(x-1)/\eps})/(1-e^{-1/\eps})\in[0,1]$, an exponential layer at
+  $x=1$; with $f=c=0$ the local DMP applies, so its violations can be counted node by node. $\eps=10^{-4},10^{-8}$.
+\item \texttt{boundary\_layers}: $\bb=(2,3)$, $c=1$, exact solution with exponential layers at $x=1$ and $y=1$;
+  $\eps=10^{-8}$.
+\item \texttt{parabolic\_layers}: $\bb=(1,0)$, $f=1$, $u_b=0$: exponential layer at $x=1$, parabolic layers at $y=0,1$;
+  no exact solution, but $0\le u\le x\le1$. $\eps=10^{-8}$.
+\end{itemize}
+
+\paragraph{Meshes.} $n\times n$ cells, $n=16,32,64,128$: uniform (``/'' diagonals) and Shishkin meshes with $n/2$
+cells in each layer region of width $\tau=2\eps/\beta\,\ln n$ for an exponential layer ($\beta$ the convection
+component across it) and $n/4$ cells in each region of width $\tau=2\sqrt{\eps}\ln n$ for the parabolic layers. Each
+Shishkin cell is split by ``/'', ``\textbackslash'' or both diagonals (Figure~\ref{fig:meshes}). With two triangles per
+cell all triangles are right-angled and the mesh is Delaunay; the crossed splitting has angles up to $180^\circ$ in the
+layer cells and is not Delaunay (Table~\ref{tab:mesh}).
+
+\begin{figure}[!htbp]\centering
+\includegraphics[width=\textwidth]{figures/aniso_meshes.pdf}
+\caption{The mesh types for \texttt{parabolic\_layers}, $n=16$; drawn for $\eps=10^{-2}$ so that the layer cells are
+visible (at $\eps=10^{-8}$ the layer regions have widths of order $10^{-7}$ and $10^{-3}$).}\label{fig:meshes}
+\end{figure}
+
+\input{tables/aniso_mesh.tex}
+
+\paragraph{Solvers and measures.} For every algebraic method: the fixed point rhs (\texttt{fp\_rhs}), the standard
+solver for these schemes, with at most 3000 iterations (efficiency); if it does not converge (Euclidean residual
+$>10^{-10}$), galerkit's Newton portfolio, and for $n\le32$ in addition the Anderson-accelerated fixed point with up to
+20\,000 iterations. Accuracy: the $L^2$ error, the maximal nodal error, and the maximal nodal error away from the layer
+regions. The energy norm is not used: on uniform meshes the quadrature does not see layers of width $\eps$. DMP: the
+mesh condition of the method checked edge by edge, the local DMP for \texttt{exp\_layer}, and the bounds of the exact
+solution.
+
+%=====================================================================================================
+\section{Accuracy}
+%=====================================================================================================
+
+\begin{figure}[!htbp]\centering
+\includegraphics[width=\textwidth]{figures/aniso_errors.pdf}
+\caption{$L^2$ error against $n$ on uniform, Shishkin ``/'' and crossed Shishkin meshes.}\label{fig:errors}
+\end{figure}
+
+\input{tables/aniso_accuracy.tex}
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Shishkin meshes resolve the layers} (Figure~\ref{fig:errors}). For \texttt{exp\_layer} the $L^2$ error at
+  $n=128$ drops from $5\cdot10^{-2}$ on the uniform mesh to about $4\cdot10^{-6}$ ($\eps=10^{-8}$) for every method,
+  with nearly the rate $(N^{-1}\ln N)^2$ and independently of $\eps$. On the uniform mesh the nodal values of this
+  layer, aligned with the mesh, are exact for most methods although the layer is not resolved; the maximal nodal error
+  alone is therefore not a measure of quality here.
+\item \textbf{The stabilization costs accuracy where it is not needed.} For \texttt{boundary\_layers} on the
+  ``/'' Shishkin mesh the Galerkin method ($L^2$ error $6.5\cdot10^{-5}$) and SUPG ($3\cdot10^{-5}$) converge with order
+  2. The algebraic methods are 5--40 times less accurate: Kuzmin and MUAS $3\cdot10^{-4}$ (order about 1.9; SMUAS
+  the same, but from unconverged iterates),
+  BJK and BBK $0.7$--$1.3\cdot10^{-3}$ (order 1.5), MC $1.3\cdot10^{-3}$ (order 1). Away from the layers their maximal
+  error, about $10^{-2}$, converges only with order 0.7--1, against 1.6--1.8 for Galerkin and SUPG. On a mesh that
+  resolves the layers, the Galerkin method is stable; the artificial diffusion of the limiters then only adds a
+  first-order consistency error.
+\item \textbf{Splitting.} ``/'' and ``\textbackslash'' give nearly the same errors. The crossed splitting doubles the
+  number of nodes and gives the same accuracy for \texttt{exp\_layer}; for \texttt{boundary\_layers} it changes the
+  ordering of the methods (Kuzmin, MUAS best).
+\item F-BBK is the least accurate method for \texttt{exp\_layer} (about twice the error of the others).
+\end{itemize}
+
+%=====================================================================================================
+\section{Efficiency of the nonlinear solvers}
+%=====================================================================================================
+
+\begin{figure}[!htbp]\centering
+\includegraphics[width=\textwidth]{figures/aniso_iterations.pdf}
+\caption{Iterations of the fixed point rhs; open circles: not converged within 3000 iterations.}\label{fig:it}
+\end{figure}
+
+\input{tables/aniso_efficiency.tex}
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{The iteration numbers grow with the anisotropy.} Kuzmin, \texttt{exp\_layer}, $\eps=10^{-8}$, $n=128$:
+  0 iterations on the uniform mesh (the low-order start is already the solution), 95 on the Shishkin ``/'' mesh, 355 on
+  the crossed one. MUAS, SMUAS and MC need 400--460 iterations on the ``/'' Shishkin mesh and do not converge within 3000
+  on the crossed one.
+\item \textbf{Robustness of fp\_rhs} (converged runs out of 64 per method): Kuzmin 62, MUAS 56, MC 52, BBK 36, BJK 29,
+  F-BBK 19, S-BBK 17. SMUAS converges on every uniform mesh but in only 22 of the 48 Shishkin runs.
+\item \textbf{Not converged at all.} With the Newton portfolio and the Anderson iteration as fallbacks, 62 of the 510
+  runs still end with a residual above $10^{-8}$: BJK 25, F-BBK 13, S-BBK 12 (mostly \texttt{parabolic\_layers}) and
+  SMUAS 12 (all three Shishkin meshes of \texttt{boundary\_layers}). The Anderson iteration converged in none of the 28
+  cases it was tried on. The errors reported for these runs are those of the best iterate.
+\end{itemize}
+
+%=====================================================================================================
+\section{The DMP and the mesh conditions}
+%=====================================================================================================
+
+\input{tables/aniso_dmp.tex}
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Two right triangles per cell: the conditions hold.} On the uniform meshes and on the ``/'' and
+  ``\textbackslash'' Shishkin meshes the Kuzmin, MC and F-/S-BBK conditions hold on every edge, for all problems. The
+  diffusion matrix of right triangles has no positive off-diagonal entries, and the non-lumped reaction term of
+  \texttt{boundary\_layers} ($c=1$) does not break $\min\{a_{ij},a_{ji}\}\le0$, since convection dominates.
+\item \textbf{Crossed splitting: the conditions fail.} Where the layer cells are split into four triangles, the obtuse
+  angles (up to $180^\circ$) make diffusion entries positive: the Kuzmin/MC condition fails on 128 to 12\,224 edges,
+  the F-/S-BBK condition at the larger $n$ (8\,064 edges for \texttt{exp\_layer} at $n=128$).
+\item \textbf{No observed DMP violation.} For \texttt{exp\_layer}, where the local DMP applies, no method violates it on
+  any mesh, including Kuzmin and MC on the crossed meshes where their condition fails. For
+  \texttt{parabolic\_layers} no method undershoots $u\ge0$.
+\item \textbf{Overshoots of the exact bound.} On the ``/'' and ``\textbackslash'' Shishkin meshes of
+  \texttt{parabolic\_layers}, BJK, Kuzmin, MUAS, BBK, F-BBK and S-BBK exceed the bound $u\le1$ of the exact solution by
+  up to 2--9\,\%; this is not a DMP violation ($f=1$), but non-physical. MC and SMUAS stay below $1+6\cdot10^{-4}$, and
+  no method overshoots on the crossed meshes.
+\end{itemize}
+
+%=====================================================================================================
+\section{Conclusions and next steps}
+%=====================================================================================================
+
+\begin{enumerate}[leftmargin=*]
+\item On layer-adapted meshes all algebraic stabilizations resolve the layers, but they are not needed for stability
+  there, and they reduce the accuracy (first order away from the layers). A natural remedy is to switch the
+  stabilization off where the mesh resolves the layer, e.g.\ by limiting only on edges with mesh P\'eclet number
+  $|\bb|h_E/\eps>1$.
+\item The nonlinear problems become harder on anisotropic meshes. Kuzmin and MUAS remain the most robust; SMUAS, which
+  is the most accurate method on general isotropic meshes, often fails to converge on Shishkin meshes.
+\item The DMP conditions of the restricted methods are satisfied on Shishkin meshes split into right triangles and
+  violated on crossed splittings, without observed DMP violations; the guaranteed methods need no condition. For
+  anisotropic meshes the splitting into right triangles is therefore the safe choice.
+\item Open: Bakhvalov-type meshes, anisotropic meshes not aligned with the axes, 3D, the solver failures of SMUAS on
+  \texttt{boundary\_layers}, and the role of $\sigma$ in the transition point.
+\end{enumerate}
+
+\paragraph{Reproducibility.} galerkit branch \texttt{feature/anisotropic-afc}, folder
+\begin{center}\texttt{examples/convection\_diffusion/2d/anisotropic\_afc}:\end{center}
+\texttt{run\_aniso.py} (the runs), \texttt{make\_report.py} (these tables and figures) and \texttt{results.json} (the
+638 runs). F-BBK and S-BBK on the crossed Shishkin mesh of \texttt{parabolic\_layers} at $n=128$ were stopped after
+more than an hour and are missing.
+
+\end{document}

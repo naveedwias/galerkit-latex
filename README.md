@@ -9,6 +9,7 @@ LaTeX sources (and compiled PDFs) of the reports written alongside the galerkit 
 | `convection_diffusion/sv_efficiency_proof_final.tex` | `sv_efficiency_proof_final.pdf` | final single-file version of the SV efficiency article (from galerkit branch `docs/sv-final-version`) |
 | `convection_diffusion/bjk16_reproduction/` | `bjk16_reproduction.pdf` | reproduction of Barrenechea, John & Knobloch, SINUM 54 (2016), Section 8 |
 | `convection_diffusion/kn23_reproduction/` | `kn23_reproduction.pdf` | SMUAS method of Knobloch, Numer. Algorithms 94 (2023): implementation check, algorithm, reproduction of the results |
+| `convection_diffusion/anisotropic_afc/` | `anisotropic_afc.pdf` | algebraic stabilizations on anisotropic (Shishkin) meshes: accuracy, nonlinear solvers, DMP mesh conditions (galerkit branch `feature/anisotropic-afc`) |
 | `navier_stokes/3d/numerical_example_3d.tex` | (not built: needs the `siunitx` package) | 3D Navier-Stokes numerical example |
 
 Each reproduction study is self-contained in its own folder (`*.tex`, `tables/`, `figures/`, PDF).
@@ -20,3 +21,4 @@ default destinations are the folders above):
 - SV estimator: `examples/convection_diffusion/sv_numerics/make_figures.py`, `make_exp36_figures.py`
 - BJK16: `examples/convection_diffusion/2d/bjk16_reproduction/make_report.py`
 - Kn23: `examples/convection_diffusion/2d/kn23_reproduction/make_report.py`
+- anisotropic meshes: `examples/convection_diffusion/2d/anisotropic_afc/make_report.py` (branch `feature/anisotropic-afc`)
