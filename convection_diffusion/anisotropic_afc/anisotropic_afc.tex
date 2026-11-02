@@ -190,14 +190,53 @@ solution.
 \end{itemize}
 
 %=====================================================================================================
+\section{Switching the stabilization off where the mesh resolves the layer}\label{sec:roff}
+%=====================================================================================================
+
+\paragraph{The switch.} With the flag \texttt{afc\_resolved\_off=True} of \texttt{CDRSolver} (default \texttt{False}),
+every edge $E=\overline{x_ix_j}$ with mesh P\'eclet number
+\[
+  \mathrm{Pe}_E=\frac{|\bb(x_E)|\,|x_j-x_i|}{2\eps(x_E)}\le\mathrm{Pe}^*\qquad(\mathrm{Pe}^*=1,\ \texttt{afc\_pe\_threshold})
+\]
+gets $d_{ij}=b_{ij}=0$: the scheme is the Galerkin method on the edges where the mesh resolves the solution. It acts on
+all eight methods through an edge mask of \texttt{AFCOperator}. The full speed $|\bb|$ is used: with its component
+along the edge, $|\bb\cdot(x_j-x_i)|$, every edge orthogonal to the flow would count as resolved, and the crosswind
+edges of the coarse cells (e.g.\ all vertical edges for $\bb=(1,0)$) would be switched off everywhere.
+
+\paragraph{Already switched off there.} The artificial diffusion of the algebraic methods,
+\[
+  d_{ij}=-\max\{a_{ij},0,a_{ji}\},
+\]
+vanishes on every edge with $\max\{a_{ij},a_{ji}\}\le0$, which is the case on a diffusion-dominated edge of a right
+triangle. At $n=128$ the meshes have between 8\,128 and 32\,640 edges
+with $\mathrm{Pe}_E\le1$. For the problems \texttt{exp\_layer} and \texttt{parabolic\_layers}, none of them has
+$d_{ij}\ne0$, so the switch changes nothing there. For
+\texttt{boundary\_layers} it acts on about 4\,000 edges at $n=128$ where the reaction term ($c=1$, not lumped) makes
+$\max\{a_{ij},a_{ji}\}>0$; switching them off loses the DMP guarantee on exactly these edges.
+
+\input{tables/aniso_roff.tex}
+
+\paragraph{Result: it does not help} (Table~\ref{tab:roff}). For \texttt{boundary\_layers} the $L^2$ errors and the
+iteration numbers are unchanged within a few per cent (Kuzmin, Shishkin ``/'', $n=128$: $3.3\cdot10^{-4}$ in both
+cases, Galerkin $6.5\cdot10^{-5}$); BJK and SMUAS on the crossed mesh become slightly worse. The reason is where the
+error comes from: in the interior of the coarse region the algebraic methods are as accurate as the Galerkin method
+($1.9\cdot10^{-3}$ against $1.5\cdot10^{-3}$ at $n=64$); their large error ($2.3\cdot10^{-2}$) sits at the transition
+corner $(1-\tau_x,1-\tau_y)$. It is caused by the long edges inside the layer strips (length $1/n$ along the layer,
+$\mathrm{Pe}_E\gg1$ since $\bb=(2,3)$ has a component along them): there the limiters add diffusion along the layer,
+the P\'eclet criterion correctly regards these edges as unresolved, and the switch does not touch them. Reducing this
+error needs a criterion that sees the resolution of the solution, not only of the mesh (e.g.\ the limiter switched
+off on edges inside the layer region along the layer).
+
+%=====================================================================================================
 \section{Conclusions and next steps}
 %=====================================================================================================
 
 \begin{enumerate}[leftmargin=*]
-\item On layer-adapted meshes all algebraic stabilizations resolve the layers, but they are not needed for stability
-  there, and they reduce the accuracy (first order away from the layers). A natural remedy is to switch the
-  stabilization off where the mesh resolves the layer, e.g.\ by limiting only on edges with mesh P\'eclet number
-  $|\bb|h_E/\eps>1$.
+\item On layer-adapted meshes all algebraic stabilizations resolve the layers, but they reduce the accuracy compared
+  with the Galerkin method, which is stable there; the error concentrates at the transition corner. Switching the
+  stabilization off on edges with mesh P\'eclet number $\le1$ (\texttt{afc\_resolved\_off}) does not help
+  (Section~\ref{sec:roff}): the methods add no diffusion on those edges anyway, and the harmful diffusion acts on the
+  long, unresolved edges along the layers.
 \item The nonlinear problems become harder on anisotropic meshes. Kuzmin and MUAS remain the most robust; SMUAS, which
   is the most accurate method on general isotropic meshes, often fails to converge on Shishkin meshes.
 \item The DMP conditions of the restricted methods are satisfied on Shishkin meshes split into right triangles and
@@ -210,7 +249,7 @@ solution.
 \paragraph{Reproducibility.} galerkit branch \texttt{feature/anisotropic-afc}, folder
 \begin{center}\texttt{examples/convection\_diffusion/2d/anisotropic\_afc}:\end{center}
 \texttt{run\_aniso.py} (the runs), \texttt{make\_report.py} (these tables and figures) and \texttt{results.json} (the
-638 runs). F-BBK and S-BBK on the crossed Shishkin mesh of \texttt{parabolic\_layers} at $n=128$ were stopped after
+638 runs, and 63 more with \texttt{afc\_resolved\_off}). F-BBK and S-BBK on the crossed Shishkin mesh of \texttt{parabolic\_layers} at $n=128$ were stopped after
 more than an hour and are missing.
 
 \end{document}
