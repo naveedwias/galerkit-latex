@@ -313,6 +313,50 @@ Anderson-accelerated fixed point iterations and Newton methods (compared for AFC
 useful with any of them, since it removes the nonlinearity from the edges where it is not needed.
 
 %=====================================================================================================
+\section{Anderson acceleration with the switch}\label{sec:aa}
+%=====================================================================================================
+
+\paragraph{Solvers.} The fixed point rhs, $(A+D)\tilde u=g-L(\boldsymbol b(u^k)-\boldsymbol d)u^k$, uses one
+factorization and a residual-based damping $u^{k+1}=u^k+\omega(\tilde u-u^k)$. Its Anderson acceleration
+(\texttt{fp\_anderson}, depth 10, Walker--Ni) combines the last 10 fixed point images by least squares, without damping,
+and restarts from the best iterate if the residual has not halved within 200 iterations. For F-BBK and S-BBK the
+undamped fixed point map is expansive (residual $1.6\to2.4\cdot10^1\to\dots\to10^{14}$ in 30 iterations on a uniform
+$16\times16$ mesh), and Anderson diverges. The new variant \texttt{fp\_anderson\_safe} accepts an accelerated iterate
+only if its residual is below the largest of the last 10 residuals (non-monotone, since Anderson is not monotone);
+otherwise it takes the damped fixed point step and clears the history. A monotone test (window 1) rejects about every
+second step and destroys the acceleration (BJK and BBK no longer converge); windows 5--30 were tested, 10 is the
+best compromise. Runs: all eight algebraic methods, four cases, $n=16$--$128$, on the uniform mesh, the Shishkin
+``/'' mesh without and with \texttt{afc\_layer\_off}, and the crossed Shishkin mesh with it (512 runs per solver;
+the safeguarded variant misses the 33 runs of \texttt{parabolic\_layers} at $n=128$, stopped). Table~\ref{tab:aa}.
+
+\input{tables/aniso_anderson.tex}
+
+\paragraph{Iterations.} With the switch on the Shishkin ``/'' mesh at $n=128$:
+\begin{itemize}[leftmargin=*]
+\item \texttt{exp\_layer}: 4--6 iterations for BJK, Kuzmin, MC, MUAS, SMUAS, BBK (fixed point: 6--10). F-BBK and
+  S-BBK converge only with the safeguarded variant (412 and 290; fixed point and plain Anderson: no convergence).
+\item \texttt{boundary\_layers}: Kuzmin and MUAS 35 and 37 (fixed point with the switch 128, without the switch 964
+  and $>3000$); SMUAS converges (84 safeguarded, 150 plain; fixed point: no convergence); MC 970, BBK 1150, F-/S-BBK
+  about 2000 instead of no convergence. BJK does not converge with any solver.
+\item \texttt{parabolic\_layers}: no gain; Kuzmin 335 against 342, MUAS 450 against 343, MC 1435 against 2335.
+\end{itemize}
+Without the switch Anderson also helps on the Shishkin mesh (\texttt{exp\_layer}: Kuzmin $95\to37$, MUAS $456\to47$),
+but the switch remains the larger effect for \texttt{exp\_layer}. The two act on different things: the switch removes
+the nonlinearity where it is not needed, Anderson accelerates the remaining fixed point iteration; together they give
+the fewest iterations in every case except \texttt{parabolic\_layers}. Counted over all 16 runs per method on the
+``/'' mesh with the switch (Table~\ref{tab:aa} and the run data): the safeguarded Anderson converges in at least as
+many runs as the fixed point for every method (F-BBK $4\to9$, S-BBK $6\to12$), with medians 5--8 for BJK, Kuzmin, MC, MUAS, SMUAS, 32
+for BBK, and about 370 for F-/S-BBK.
+
+\paragraph{Cost and accuracy.} An Anderson iteration costs 1.6--2.2 times a fixed point iteration (the residual and
+the least-squares problem of size $N\times10$; timed one at a time at $n=128$). In time, \texttt{boundary\_layers}
+with the switch is solved 1.7--2.2 times faster (Kuzmin: 2.3\,s instead of 3.8\,s),
+\texttt{exp\_layer} without
+the switch 6 times faster, and \texttt{parabolic\_layers} 1.7 times slower. Where both solvers converge (555 pairs), the $L^2$ errors
+agree to $10^{-3}$, except F-BBK (up to 8\,\% with both residuals below $10^{-10}$, so its nonlinear problem appears to
+have more than one solution).
+
+%=====================================================================================================
 \section{Conclusions and next steps}
 %=====================================================================================================
 
@@ -332,6 +376,11 @@ useful with any of them, since it removes the nonlinearity from the edges where 
   by up to a factor 5. Smoother layer-adapted meshes (Bakhvalov--Shishkin, Bakhvalov, Dur\'an--Lombardi;
   Section~\ref{sec:meshes}) change the iterations by at most a factor 2 in either direction; with the switch the mesh
   type hardly matters. Fewest iterations: Shishkin mesh, switch on, Kuzmin or MUAS.
+\item Anderson acceleration on top of the switch (Section~\ref{sec:aa}) reduces the iterations further, by a factor 3--4
+  for \texttt{boundary\_layers} (Kuzmin and MUAS: 35--37 on the Shishkin mesh) and lets SMUAS converge there; with
+  the non-monotone safeguard (\texttt{fp\_anderson\_safe}) F-BBK and S-BBK converge too. It does not help for the
+  parabolic layers. Fewest iterations overall: Shishkin mesh, \texttt{afc\_layer\_off}, \texttt{fp\_anderson\_safe},
+  Kuzmin or MUAS.
 \item Open: anisotropic meshes not aligned with the axes, 3D, the solver failures of SMUAS on
   \texttt{boundary\_layers}, and the role of $\sigma$ in the transition point.
 \end{enumerate}
@@ -339,8 +388,8 @@ useful with any of them, since it removes the nonlinearity from the edges where 
 \paragraph{Reproducibility.} galerkit branch \texttt{feature/anisotropic-afc}, folder
 \begin{center}\texttt{examples/convection\_diffusion/2d/anisotropic\_afc}:\end{center}
 \texttt{run\_aniso.py} (the runs), \texttt{make\_report.py} (these tables and figures) and \texttt{results.json} (the
-1688 runs: 638 on uniform and Shishkin meshes, 63 with \texttt{afc\_resolved\_off}, 507 with
-\texttt{afc\_layer\_off}, 480 on the graded meshes). F-BBK and S-BBK on the crossed Shishkin mesh of \texttt{parabolic\_layers} at $n=128$ were stopped after
+2679 runs: 638 on uniform and Shishkin meshes, 63 with \texttt{afc\_resolved\_off}, 507 with
+\texttt{afc\_layer\_off}, 480 on the graded meshes; and 991 with Anderson acceleration). F-BBK and S-BBK on the crossed Shishkin mesh of \texttt{parabolic\_layers} at $n=128$ were stopped after
 more than an hour and are missing.
 
 \end{document}
