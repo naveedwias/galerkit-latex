@@ -357,6 +357,52 @@ agree to $10^{-3}$, except F-BBK (up to 8\,\% with both residuals below $10^{-10
 have more than one solution).
 
 %=====================================================================================================
+\section{Newton's method with regularized limiters on the parabolic layers}\label{sec:nreg}
+%=====================================================================================================
+
+\paragraph{Regularization.} The limiters are built from $x^+=\max\{x,0\}$, $|x|$, $\max$/$\min$, $\min\{1,Q/P\}$,
+the local extrema $u_i^{\max},u_i^{\min}$ and the choice of $R^+$ or $R^-$ by the sign of a flux; Newton's method
+for them is a semismooth Newton method and often fails. With the option \texttt{AFCOperator(reg=$\sigma$)}, or
+\texttt{CDRSolver(afc\_reg=$\sigma$)}, each of these is replaced by a $C^1$ function with error at most of order
+$\sigma$, in the spirit of the differentiable shock detectors of Badia and Bonilla:
+\[
+  x^+\to\frac{(x^+)^2}{x^++\sigma},\quad |x|\to x^+_\sigma+(-x)^+_\sigma,\quad \max\{a,b\}\to b+(a-b)^+_\sigma,\quad
+  \min\Bigl\{1,\frac QP\Bigr\}\to1-\frac{(P-Q)^+_{\sigma_P}}{P+\sigma_P},
+\]
+the sign choice by $R^+h(f)+R^-(1-h(f))$, $h(f)=\frac12(1+f/\sqrt{f^2+\sigma_f^2})$, and the local extrema by a
+log-sum-exp; $\sigma$ acts on differences of $u$, $\sigma_f=\sigma|d_{ij}|$ on fluxes, $\sigma_P=\sigma\sum_j|d_{ij}|$
+on the node sums. For BJK the extrema enter $Q_i^\pm$ multiplied by $\gamma_i$, which reaches $10^7$ on the Shishkin
+meshes, and are smoothed on the scale $\sigma/\gamma_i$. As $\sigma\to0$ the stabilization $b_{ij}(u)$ converges to the
+original one with $O(\sigma)$ for all seven methods (MC is not regularized). The Jacobian is computed by coloured
+finite differences (25 residual evaluations at $n=128$).
+
+\paragraph{Solver.} \texttt{solve\_afc(..., "newton\_cont")}: Newton with line search for
+$\sigma=10^{-1},10^{-2},\dots,10^{-6}$, each stage started from the previous solution (at most 40 steps per stage;
+stop at the first stage that fails), then at most 20 Newton steps on the original scheme ($\sigma=0$) from the last
+regularized solution. A run counts as solved only if this last step reaches the residual $10^{-10}$ of the original
+scheme; the regularized solution itself is a different discretization (it differs by about $7\sigma$ in the maximum
+norm at $n=32$). Runs: \texttt{parabolic\_layers}, seven methods, $n=16$--$128$, uniform mesh and Shishkin ``/'' mesh
+without and with \texttt{afc\_layer\_off} (84 runs), Table~\ref{tab:nreg}.
+
+\input{tables/aniso_newton_reg.tex}
+
+\paragraph{Results.}
+\begin{itemize}[leftmargin=*]
+\item \textbf{BBK is solved in all 12 runs}, with 26--64 Newton steps (Shishkin: 26--33); the fixed point rhs solves 1
+  of them (uniform, $n=16$), Anderson 5 (none at $n=128$). The continuation is easy for BBK (1--3 steps
+  per stage at small $\sigma$) and the final Newton step on the original scheme converges in 1--2 steps.
+\item \textbf{Kuzmin} (12 of 12) and \textbf{MUAS} (9 of 12; the fixed point solves all 12): 26--86 Newton steps
+  instead of 101--1298 fixed point iterations; the solutions coincide with those of the fixed point.
+\item \textbf{BJK, F-BBK, S-BBK} fail at $\sigma=10^{-3}$ (Newton stagnates with the residual $10^{-3}$), and SMUAS
+  already at $\sigma=10^{-1}$ (2 of 12 runs, on uniform meshes; the fixed point: 4, all on uniform meshes); the Jacobian is correct (checked against central
+  differences), so the regularized problems themselves are hard for Newton.
+\item \textbf{Cost.} A Newton step costs one finite difference Jacobian (25 residuals) and one sparse LU of a matrix
+  with a distance-2 stencil, about 30--100 fixed point iterations. For Kuzmin and MUAS Newton is therefore slower
+  in time than the fixed point (Shishkin, $n=128$: 70--90\,s against 3--14\,s); for BBK it is the only solver that
+  works (32--37\,s at $n=128$). An analytic Jacobian of the regularized limiters would reduce the cost.
+\end{itemize}
+
+%=====================================================================================================
 \section{Conclusions and next steps}
 %=====================================================================================================
 
@@ -381,6 +427,9 @@ have more than one solution).
   the non-monotone safeguard (\texttt{fp\_anderson\_safe}) F-BBK and S-BBK converge too. It does not help for the
   parabolic layers. Fewest iterations overall: Shishkin mesh, \texttt{afc\_layer\_off}, \texttt{fp\_anderson\_safe},
   Kuzmin or MUAS.
+\item For the parabolic layers, Newton's method with regularized ($C^1$) limiters, continuation in the regularization
+  and a final Newton step on the original scheme (Section~\ref{sec:nreg}) solves BBK in all 12 runs (26--64 steps; fixed
+  point 1, Anderson 5), and Kuzmin and MUAS in 26--86 steps; BJK, SMUAS, F-BBK and S-BBK remain unsolved.
 \item Open: anisotropic meshes not aligned with the axes, 3D, the solver failures of SMUAS on
   \texttt{boundary\_layers}, and the role of $\sigma$ in the transition point.
 \end{enumerate}
@@ -388,8 +437,8 @@ have more than one solution).
 \paragraph{Reproducibility.} galerkit branch \texttt{feature/anisotropic-afc}, folder
 \begin{center}\texttt{examples/convection\_diffusion/2d/anisotropic\_afc}:\end{center}
 \texttt{run\_aniso.py} (the runs), \texttt{make\_report.py} (these tables and figures) and \texttt{results.json} (the
-2679 runs: 638 on uniform and Shishkin meshes, 63 with \texttt{afc\_resolved\_off}, 507 with
-\texttt{afc\_layer\_off}, 480 on the graded meshes; and 991 with Anderson acceleration). F-BBK and S-BBK on the crossed Shishkin mesh of \texttt{parabolic\_layers} at $n=128$ were stopped after
+2763 runs: 638 on uniform and Shishkin meshes, 63 with \texttt{afc\_resolved\_off}, 507 with
+\texttt{afc\_layer\_off}, 480 on the graded meshes; 991 with Anderson acceleration, 84 with Newton and regularized limiters). F-BBK and S-BBK on the crossed Shishkin mesh of \texttt{parabolic\_layers} at $n=128$ were stopped after
 more than an hour and are missing.
 
 \end{document}
