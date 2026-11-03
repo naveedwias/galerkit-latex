@@ -373,8 +373,12 @@ the sign choice by $R^+h(f)+R^-(1-h(f))$, $h(f)=\frac12(1+f/\sqrt{f^2+\sigma_f^2
 log-sum-exp; $\sigma$ acts on differences of $u$, $\sigma_f=\sigma|d_{ij}|$ on fluxes, $\sigma_P=\sigma\sum_j|d_{ij}|$
 on the node sums. For BJK the extrema enter $Q_i^\pm$ multiplied by $\gamma_i$, which reaches $10^7$ on the Shishkin
 meshes, and are smoothed on the scale $\sigma/\gamma_i$. As $\sigma\to0$ the stabilization $b_{ij}(u)$ converges to the
-original one with $O(\sigma)$ for all seven methods (MC is not regularized). The Jacobian is computed by coloured
-finite differences (25 residual evaluations at $n=128$).
+original one with $O(\sigma)$ for all seven methods (MC is not regularized). The Jacobian is exact: the regularized
+$b_{ij}(u)$ is evaluated once more with a sparse forward differentiation type that carries every intermediate array
+together with its sparse derivative with respect to $u$ (the same code gives the values and the derivatives, so they
+cannot diverge), and $\partial b/\partial u$ enters the residual Jacobian as for the other methods. It agrees with
+central differences up to their round-off. A coloured finite difference Jacobian (25 residual evaluations at $n=128$)
+remains available (\texttt{reg\_jacobian="fd"}).
 
 \paragraph{Solver.} \texttt{solve\_afc(..., "newton\_cont")}: Newton with line search for
 $\sigma=10^{-1},10^{-2},\dots,10^{-6}$, each stage started from the previous solution (at most 40 steps per stage;
@@ -382,24 +386,28 @@ stop at the first stage that fails), then at most 20 Newton steps on the origina
 regularized solution. A run counts as solved only if this last step reaches the residual $10^{-10}$ of the original
 scheme; the regularized solution itself is a different discretization (it differs by about $7\sigma$ in the maximum
 norm at $n=32$). Runs: \texttt{parabolic\_layers}, seven methods, $n=16$--$128$, uniform mesh and Shishkin ``/'' mesh
-without and with \texttt{afc\_layer\_off} (84 runs), Table~\ref{tab:nreg}.
+without and with \texttt{afc\_layer\_off} (84 runs, with the exact Jacobian; also repeated with the finite difference
+one), Table~\ref{tab:nreg}.
 
 \input{tables/aniso_newton_reg.tex}
 
 \paragraph{Results.}
 \begin{itemize}[leftmargin=*]
-\item \textbf{BBK is solved in all 12 runs}, with 26--64 Newton steps (Shishkin: 26--33); the fixed point rhs solves 1
+\item \textbf{BBK is solved in all 12 runs}, with 25--65 Newton steps (Shishkin: 25--32); the fixed point rhs solves 1
   of them (uniform, $n=16$), Anderson 5 (none at $n=128$). The continuation is easy for BBK (1--3 steps
   per stage at small $\sigma$) and the final Newton step on the original scheme converges in 1--2 steps.
-\item \textbf{Kuzmin} (12 of 12) and \textbf{MUAS} (9 of 12; the fixed point solves all 12): 26--86 Newton steps
-  instead of 101--1298 fixed point iterations; the solutions coincide with those of the fixed point.
+\item \textbf{Kuzmin} (12 of 12) and \textbf{MUAS} (9 of 12; the fixed point solves all 12): Newton steps
+  (Kuzmin 28--75, MUAS 26--72) instead of 101--1298 fixed point iterations; the solutions coincide with those of the fixed point.
 \item \textbf{BJK, F-BBK, S-BBK} fail at $\sigma=10^{-3}$ (Newton stagnates with the residual $10^{-3}$), and SMUAS
-  already at $\sigma=10^{-1}$ (2 of 12 runs, on uniform meshes; the fixed point: 4, all on uniform meshes); the Jacobian is correct (checked against central
+  already at $\sigma=10^{-1}$ (3 of 12 runs, on uniform meshes; the fixed point: 4, all on uniform meshes); the Jacobian is correct (checked against central
   differences), so the regularized problems themselves are hard for Newton.
-\item \textbf{Cost.} A Newton step costs one finite difference Jacobian (25 residuals) and one sparse LU of a matrix
-  with a distance-2 stencil, about 30--100 fixed point iterations. For Kuzmin and MUAS Newton is therefore slower
-  in time than the fixed point (Shishkin, $n=128$: 70--90\,s against 3--14\,s); for BBK it is the only solver that
-  works (32--37\,s at $n=128$). An analytic Jacobian of the regularized limiters would reduce the cost.
+\item \textbf{Cost.} The exact Jacobian takes 0.07--0.16\,s at $n=128$, 1.5--3 times less than the finite difference
+  one, and the runs became 1.2--2.2 times faster (Shishkin ``/'', $n=128$: Kuzmin $90\to38$\,s, with the switch
+  $71\to32$\,s; BBK $37\to22$\,s, with the switch $32\to15$\,s). The step counts and the solved runs are almost the
+  same (SMUAS one more, 3 of 12). The sparse LU of the Jacobian (distance-2 stencil, 0.13--0.8\,s) now takes about
+  three quarters of the time; COLAMD was the fastest ordering tried, and GMRES preconditioned with the LU of the
+  low-order matrix $A+D$ does not converge in 600 iterations. For Kuzmin and MUAS Newton therefore remains slower in
+  time than the fixed point (3--14\,s); for BBK it is the only solver that works.
 \end{itemize}
 
 %=====================================================================================================
@@ -428,8 +436,8 @@ without and with \texttt{afc\_layer\_off} (84 runs), Table~\ref{tab:nreg}.
   parabolic layers. Fewest iterations overall: Shishkin mesh, \texttt{afc\_layer\_off}, \texttt{fp\_anderson\_safe},
   Kuzmin or MUAS.
 \item For the parabolic layers, Newton's method with regularized ($C^1$) limiters, continuation in the regularization
-  and a final Newton step on the original scheme (Section~\ref{sec:nreg}) solves BBK in all 12 runs (26--64 steps; fixed
-  point 1, Anderson 5), and Kuzmin and MUAS in 26--86 steps; BJK, SMUAS, F-BBK and S-BBK remain unsolved.
+  and a final Newton step on the original scheme (Section~\ref{sec:nreg}) solves BBK in all 12 runs (25--65 steps; fixed
+  point 1, Anderson 5), and Kuzmin and MUAS in 26--75 steps; BJK, SMUAS, F-BBK and S-BBK remain unsolved.
 \item Open: anisotropic meshes not aligned with the axes, 3D, the solver failures of SMUAS on
   \texttt{boundary\_layers}, and the role of $\sigma$ in the transition point.
 \end{enumerate}
@@ -437,8 +445,8 @@ without and with \texttt{afc\_layer\_off} (84 runs), Table~\ref{tab:nreg}.
 \paragraph{Reproducibility.} galerkit branch \texttt{feature/anisotropic-afc}, folder
 \begin{center}\texttt{examples/convection\_diffusion/2d/anisotropic\_afc}:\end{center}
 \texttt{run\_aniso.py} (the runs), \texttt{make\_report.py} (these tables and figures) and \texttt{results.json} (the
-2763 runs: 638 on uniform and Shishkin meshes, 63 with \texttt{afc\_resolved\_off}, 507 with
-\texttt{afc\_layer\_off}, 480 on the graded meshes; 991 with Anderson acceleration, 84 with Newton and regularized limiters). F-BBK and S-BBK on the crossed Shishkin mesh of \texttt{parabolic\_layers} at $n=128$ were stopped after
+2847 runs: 638 on uniform and Shishkin meshes, 63 with \texttt{afc\_resolved\_off}, 507 with
+\texttt{afc\_layer\_off}, 480 on the graded meshes; 991 with Anderson acceleration, 168 with Newton and regularized limiters, 84 each with the exact and the finite difference Jacobian). F-BBK and S-BBK on the crossed Shishkin mesh of \texttt{parabolic\_layers} at $n=128$ were stopped after
 more than an hour and are missing.
 
 \end{document}
