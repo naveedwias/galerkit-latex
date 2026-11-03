@@ -39,7 +39,9 @@ the iteration numbers of the fixed point rhs grow with the anisotropy, and 62 of
 of three solvers. The DMP mesh conditions of the Kuzmin, MC and F-/S-BBK methods hold on Shishkin meshes split into two
 right triangles per cell and fail on the non-Delaunay crossed splitting; no DMP violation was observed even there.
 Switching the limiter off on the long edges along the layers cuts the iterations by factors 3--50, much more than
-replacing the Shishkin mesh by Bakhvalov-type or geometrically graded meshes (at most a factor 2).
+replacing the Shishkin mesh by Bakhvalov-type or geometrically graded meshes (at most a factor 2). Two examples with interior layers complete the study: for a straight interior layer the algebraic methods on
+Bakhvalov-type meshes are the most accurate; for a profile transported along circles a layer-aligned polar mesh is
+essential, and the algebraic methods clip the genuine extrema unless the limiter is switched off along the layers.
 \end{abstract}
 
 \tableofcontents
@@ -411,6 +413,171 @@ one), Table~\ref{tab:nreg}.
 \end{itemize}
 
 %=====================================================================================================
+\section{Newton with regularized limiters on all problems and layer-adapted meshes}\label{sec:nall}
+%=====================================================================================================
+
+The solver of Section~\ref{sec:nreg} was run for all four cases on the uniform, Shishkin, Bakhvalov--Shishkin and
+Bakhvalov meshes, each layer-adapted mesh with and without \texttt{afc\_layer\_off} (784 runs, $n=16$--$128$, exact
+Jacobian). Table~\ref{tab:nall} counts the solved runs.
+
+\input{tables/aniso_newton_all.tex}
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{BBK} is solved by Newton in almost all runs of \texttt{boundary\_layers} and \texttt{parabolic\_layers}
+  on the Shishkin-type meshes (25--40 steps at $n=128$), where the fixed point needs more than 2000 iterations or
+  fails. \textbf{S-BBK} is solved for \texttt{boundary\_layers} on the Shishkin-type meshes at $n=128$ (about 70
+  steps; 1 of the 4 mesh sizes, against none with the fixed point); for \texttt{exp\_layer} F-BBK and S-BBK are not solved by Newton.
+\item \textbf{Kuzmin} is solved everywhere, with 19--75 Newton steps at $n=128$ against 128--964 fixed point
+  iterations on \texttt{boundary\_layers} and \texttt{parabolic\_layers}. On \texttt{boundary\_layers} the
+  Bakhvalov-type meshes help Newton: with the switch, Kuzmin and MUAS are solved for all $n$ in 18--19 steps.
+\item For \texttt{exp\_layer} the fixed point with the switch remains the fastest (6--10 iterations against 20--45
+  Newton steps).
+\item Newton is not uniformly more robust: MUAS with the switch on \texttt{parabolic\_layers} is solved by the fixed
+  point for all $n$ and by Newton for one or two; BJK on \texttt{boundary\_layers} and \texttt{parabolic\_layers},
+  SMUAS on the Shishkin-type meshes, and F-/S-BBK on \texttt{exp\_layer} and \texttt{parabolic\_layers} remain
+  unsolved with every mesh and solver.
+\end{itemize}
+
+%=====================================================================================================
+\section{An interior layer}\label{sec:interior}
+%=====================================================================================================
+
+\paragraph{Problem \texttt{interior\_layer}.} $\eps=10^{-8}$, $\bb=(1,0)$, $c=f=0$ on $(0,1)^2$; $u_b=1$ on
+$\{x=0,\,y>\frac12\}$ and on $y=1$ ($x<1$), $u_b=0$ elsewhere, also on the outflow boundary $x=1$. The jump of the
+inflow data creates an interior parabolic layer along $y=\frac12$ of width $\sim\sqrt{\eps x}$, and there is an
+exponential outflow layer at $x=1$ for $y>\frac12$; $0\le u\le1$. There is no exact solution; away from the outflow
+layer the asymptotic solution
+\[
+  u_{\rm ref}(x,y)=\tfrac12\,\mathrm{erfc}\Bigl(\frac{1/2-y}{2\sqrt{\eps x}}\Bigr)
+\]
+solves $u_x=\eps u_{yy}$ exactly; the neglected term $\eps u_{xx}$ is negligible for $\eps=10^{-8}$. Errors are
+measured against $u_{\rm ref}$ for $x\le1-\tau_x$ (the $L^2$ error) and for $0.1\le x\le1-\tau_x$ (the maximal
+nodal error), since at the inflow corner the layer width $\sqrt{\eps x}\to0$ cannot be resolved by any mesh.
+
+\paragraph{Meshes.} Uniform, and Shishkin, Bakhvalov--Shishkin and Bakhvalov meshes refined at $x=1$
+($\tau_x=2\eps\ln n$) and around $y=\frac12$: \texttt{layer\_points(..., side="interior")} puts $n/4$ cells on each
+side of $\frac12$ inside $|y-\frac12|\le\tau_y=2\sqrt\eps\ln n$. All ten methods, the algebraic ones also with
+\texttt{afc\_layer\_off}; the nonlinear solvers \texttt{fp\_anderson\_safe}, then \texttt{newton\_cont}, then
+\texttt{fp\_rhs}, the first that solves the scheme. Results for $n=16,32,64$ (the runs at $n=128$ were stopped).
+
+\input{tables/aniso_interior.tex}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/interior_cut_shishkin_n64.png}
+\caption{\texttt{interior\_layer}: $u_h$ along $x\approx\frac12$ across the interior layer (zoom
+$|y-\frac12|\le1.5\tau_y$), Shishkin mesh, $n=64$; grey: reference; orange: limiter switched off along the
+layers.}\label{fig:interior-cut}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/interior_errors.png}
+\caption{\texttt{interior\_layer}: maximal nodal error for $0.1\le x\le1-\tau_x$ against $n$; crosses: nonlinear
+problem not solved.}\label{fig:interior-err}
+\end{figure}
+
+\paragraph{Results} (Table~\ref{tab:interior}, Figures~\ref{fig:interior-cut}, \ref{fig:interior-err}).
+\begin{itemize}[leftmargin=*]
+\item \textbf{The algebraic methods are the most accurate here.} On the Bakhvalov--Shishkin and Bakhvalov meshes
+  BBK, MUAS and SMUAS have $L^2$ errors of $3.3$--$4.3\cdot10^{-5}$ at $n=64$, 30 times smaller than Galerkin
+  ($1.2\cdot10^{-3}$) and 5 times smaller than SUPG ($2\cdot10^{-4}$), and they keep $u_h\le1$; Galerkin and SUPG
+  overshoot by 0.4--1.8\,\%. The solution is monotone across the layer, so the limiters have no genuine extremum
+  to clip.
+\item \textbf{The Bakhvalov-type meshes are much better than the Shishkin mesh} for this layer: about a factor 10 in
+  the errors of all methods; the abrupt transition of the Shishkin mesh at the edge of the layer region costs
+  accuracy.
+\item \textbf{The switch along the layers} lowers the maximal error of some methods (Kuzmin on the
+  Bakhvalov--Shishkin mesh $1.1\cdot10^{-2}\to4.4\cdot10^{-3}$) but brings back overshoots of 0.3--0.6\,\%.
+\item On the uniform mesh the layer is not resolved: Galerkin is useless, and the algebraic methods smear it over a
+  width about 100 times the reference width.
+\end{itemize}
+
+%=====================================================================================================
+\section{Transport of a profile along circles}\label{sec:rotating}
+%=====================================================================================================
+
+\paragraph{Problem \texttt{rotating\_profile}.} The steady example of arXiv:2204.07480, Section~7, as it was given to
+us: $\eps=10^{-5}$, $\bb=(-y,x)$, $c=f=0$ on $(0,1)^2$; at the inlet $y=0$
+\[
+  u(x,0)=\begin{cases}\frac{x-0.375}{\xi}+1, & x\in[0.375-\xi,0.375),\\
+  -0.75\,\frac{x-0.5}{0.125}+0.25, & x\in[0.375,0.5),\\
+  0.25\,\frac{x-0.625}{0.125}+0.5, & x\in[0.5,0.625),\\
+  -0.5\,\frac{x-0.625}{\xi}+0.5, & x\in[0.625,0.625+\xi),\\
+  32(x-0.75)(1-x), & x\in[0.75,1],\\ 0 & \text{else},\end{cases}\qquad\xi=10^{-3},
+\]
+$u=0$ at $x=1$ and homogeneous Neumann conditions on $x=0$ and $y=1$ (the outlets). The profile is transported along
+the circles $r=\sqrt{x^2+y^2}=$ const: steep interior layers along the arcs $r\approx0.375$ (a ramp $0\to1$) and
+$r\approx0.625$ (a drop $0.5\to0$), weak layers (kinks) along $r=0.5$ and $0.75$, and a hump; $0\le u\le1$. The
+quantities of interest of that paper could not be used (the paper was not accessible from our environment); the
+quantities below are our own.
+
+\paragraph{Reference.} In polar coordinates $\bb\cdot\nabla u=u_\theta$; without the term $\eps u_{\theta\theta}/r^2$,
+which is small against $\eps u_{rr}$ in the thin layers, the problem is the radial heat equation
+$u_\theta=\eps(u_{rr}+u_r/r)$ in the ``time'' $\theta\in[0,\pi/2]$ with the inflow profile as initial value. It is
+solved with $4\cdot10^4$ radial cells and $4000$ Crank--Nicolson steps; halving both changes it by $3\cdot10^{-5}$.
+
+\paragraph{Meshes} (all with about $n\times n$ cells; Figure~\ref{fig:rot-sol}, first column).
+\begin{itemize}[leftmargin=*]
+\item \emph{uniform};
+\item \emph{polar}: rings $r=$ const, uniform in $r$ up to $0.9$ and then blended to the square, $n$ uniform angles
+  (\texttt{polar\_square\_mesh}); aligned with the layers;
+\item \emph{polar, layer-adapted}: the polar mesh with Shishkin-type refinement across $r=0.375,0.625$ ($n/4$ rings
+  each) and $0.5,0.75$ ($n/10$ each), half-width $\tau=2\sqrt\eps\ln n$ (\texttt{graded\_points}); anisotropic and
+  aligned (median aspect ratio about 3);
+\item \emph{tensor, layer-refined}: a tensor mesh refined in $x$ and in $y$ at the same four values; anisotropic,
+  but aligned with the arcs only near the inlet and the outlet.
+\end{itemize}
+Variants of the algebraic methods: \emph{+ off}, the limiter switched off along the layers (\texttt{afc\_layer\_off}
+with aspect threshold 3, since the polar layer cells are only moderately stretched), and $\mu=2$, the relaxed limiter
+$R_i=\min\{1,\mu Q_i/P_i\}$ (\texttt{afc\_q\_relax}; for Kuzmin the form (27) of Knobloch), which limits less but no
+longer guarantees the DMP. For the Neumann vertices BJK uses the convex-hull rule for $\gamma_i$ and SMUAS no
+reflected values. Results for $n=32,64$ (the runs at $n=128$ were stopped).
+
+\input{tables/aniso_rotating.tex}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/rotating_outlet_polar_layer_n64.png}
+\caption{\texttt{rotating\_profile}: outlet profile $u_h(0,y)$ on the layer-adapted polar mesh, $n=64$; grey:
+reference; blue: the method; orange: limiter off along the layers; green: $\mu=2$.}\label{fig:rot-outlet}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/rotating_outlet_tensor_layer_n64.png}
+\caption{\texttt{rotating\_profile}: outlet profile on the tensor mesh refined in $x$ and $y$, $n=64$.}
+\label{fig:rot-outlet-tensor}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/rotating_solutions_n64.png}
+\caption{\texttt{rotating\_profile}, $n=64$: the four meshes and the solutions of Galerkin, SUPG, Kuzmin, MUAS and
+BBK ($\min u_h$, $\max u_h$ in brackets).}\label{fig:rot-sol}
+\end{figure}
+
+\paragraph{Results} (Table~\ref{tab:rotating}, Figures~\ref{fig:rot-outlet}--\ref{fig:rot-sol}).
+\begin{itemize}[leftmargin=*]
+\item \textbf{The mesh matters most.} The layer-adapted polar mesh is the best for every method; the tensor mesh
+  refined in $x$ and $y$ is the worst for every method, worse than the uniform mesh, since in the middle of the domain
+  it is fine in directions that do not cross the arcs.
+\item \textbf{On the aligned mesh Galerkin and SUPG are the most accurate} ($L^2$ error $1.2$--$1.3\cdot10^{-2}$ at
+  $n=64$) but undershoot by 2--5\,\%. The algebraic methods keep $0\le u_h\le1$ and are 3.5--6 times less accurate:
+  their limiters cannot distinguish the genuine extrema of the profile (the peak behind $r=0.375$, the minimum at the
+  kink $r=0.5$, the top of the hump) from oscillations, switch to the low-order scheme there along the whole
+  streamline, and clip them (Figure~\ref{fig:rot-outlet}); the diagonal edges of the polar cells add crosswind
+  diffusion.
+\item \textbf{The switch along the layers closes most of the gap} on the aligned mesh: BJK $1.7\cdot10^{-2}$, BBK
+  $1.9\cdot10^{-2}$, MC and MUAS $6.8\to2.9\cdot10^{-2}$; it recovers the peak and most of the hump, at the price of
+  undershoots of 0.3--0.4\,\% (MC, MUAS) and 3\,\% (BJK, BBK). On the misaligned tensor mesh it is harmful
+  (undershoots of 30\,\%).
+\item \textbf{The relaxed limiter $\mu=2$ helps little} (Kuzmin, MUAS $6.8\to5.7\cdot10^{-2}$) and keeps the bounds.
+\item Accurate and almost bound-preserving: MC or MUAS with the switch on the layer-adapted polar mesh; most accurate
+  with small undershoots: SUPG on that mesh. BJK and F-BBK are not solved in several runs.
+\end{itemize}
+
+%=====================================================================================================
 \section{Conclusions and next steps}
 %=====================================================================================================
 
@@ -438,15 +605,31 @@ one), Table~\ref{tab:nreg}.
 \item For the parabolic layers, Newton's method with regularized ($C^1$) limiters, continuation in the regularization
   and a final Newton step on the original scheme (Section~\ref{sec:nreg}) solves BBK in all 12 runs (25--65 steps; fixed
   point 1, Anderson 5), and Kuzmin and MUAS in 26--75 steps; BJK, SMUAS, F-BBK and S-BBK remain unsolved.
-\item Open: anisotropic meshes not aligned with the axes, 3D, the solver failures of SMUAS on
+\item Interior layers (Sections~\ref{sec:interior}, \ref{sec:rotating}): for a straight interior layer with a monotone
+  profile across it the algebraic methods on Bakhvalov-type meshes are the most accurate (BBK, MUAS, SMUAS: $L^2$
+  errors 30 times below Galerkin, no overshoots). For a profile with genuine extrema transported along circles the
+  layer-aligned (polar, layer-adapted) mesh is essential, Galerkin and SUPG are the most accurate but violate the
+  bounds, and the algebraic methods clip the extrema; switching the limiter off along the layers recovers most of the
+  accuracy with undershoots below 0.4\,\% (MC, MUAS).
+\item Open: the quantities of interest of arXiv:2204.07480 for the rotating profile, limiters that do not clip smooth
+  extrema, anisotropic meshes not aligned with the axes, 3D, the solver failures of SMUAS on
   \texttt{boundary\_layers}, and the role of $\sigma$ in the transition point.
 \end{enumerate}
 
 \paragraph{Reproducibility.} galerkit branch \texttt{feature/anisotropic-afc}, folder
 \begin{center}\texttt{examples/convection\_diffusion/2d/anisotropic\_afc}:\end{center}
-\texttt{run\_aniso.py} (the runs), \texttt{make\_report.py} (these tables and figures) and \texttt{results.json} (the
-2847 runs: 638 on uniform and Shishkin meshes, 63 with \texttt{afc\_resolved\_off}, 507 with
-\texttt{afc\_layer\_off}, 480 on the graded meshes; 991 with Anderson acceleration, 168 with Newton and regularized limiters, 84 each with the exact and the finite difference Jacobian). F-BBK and S-BBK on the crossed Shishkin mesh of \texttt{parabolic\_layers} at $n=128$ were stopped after
-more than an hour and are missing.
+\texttt{run\_aniso.py} (the runs), \texttt{interior\_layer.py} and \texttt{rotating\_profile.py} (the examples of
+Sections~\ref{sec:interior}, \ref{sec:rotating}), \texttt{make\_report.py} (these tables and figures) and
+\texttt{results.json}. The latter holds the 3547 runs of \texttt{run\_aniso.py}:
+\begin{itemize}[leftmargin=*,nosep]
+\item 638 on uniform and Shishkin meshes, 63 with \texttt{afc\_resolved\_off}, 507 with \texttt{afc\_layer\_off},
+  480 on the graded meshes;
+\item 991 with Anderson acceleration;
+\item 868 with Newton and regularized limiters (784 with the exact Jacobian on all problems and meshes, 84 with the
+  finite difference one).
+\end{itemize}
+F-BBK and S-BBK on the crossed Shishkin mesh of \texttt{parabolic\_layers} at $n=128$ were stopped after more than an
+hour and are missing; so are the runs at $n=128$ of the two examples of Sections~\ref{sec:interior} and
+\ref{sec:rotating}.
 
 \end{document}
