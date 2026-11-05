@@ -1,0 +1,554 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{adjustbox}
+\usepackage[hidelinks]{hyperref}
+\emergencystretch=3em
+
+\newcommand{\bu}{\boldsymbol{u}}
+\newcommand{\bv}{\boldsymbol{v}}
+\newcommand{\bw}{\boldsymbol{w}}
+\newcommand{\bff}{\boldsymbol{f}}
+\newcommand{\dt}{\Delta t}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{Taylor--Hood $\theta$-schemes and adaptive SUPG\\for the time-dependent Navier--Stokes equations:\\implementation, observations and results}
+\author{galerkit, branch \code{time-navier-stokes}}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This report documents two pieces of code written on the galerkit branch \code{time-navier-stokes}
+(package \code{galerkit.\allowbreak navier\_stokes.\allowbreak twod.\allowbreak theta\_th}).
+Part~I is a fresh Taylor--Hood $P_2/P_1$ implementation of the coupled $\theta$-schemes of
+John~\cite{John2016}, Sect.~7.3.1, without any stabilisation, together with the examples of that section
+(Examples 7.44, 7.57 in two dimensions, 7.58 and 7.62, based on Examples D.5, D.7, D.8, D.9 of Appendix~D).
+Part~II extends the adaptive SUPG method of de Frutos, Garc\'{\i}a-Archilla, John and Novo~\cite{FGJN14}
+from evolutionary convection--diffusion--reaction equations to the Navier--Stokes equations, with the
+inf-sup stable Taylor--Hood pair (no pressure stabilisation), and reports first simulations for the smooth
+solution of Example D.7. All rates and comparisons below are \emph{observed numerically}; nothing in this
+report is a proof. The verdict for Part~II is that the implementation is verified and the adaptive loop works,
+but on the smooth test problem no adaptive variant is more efficient than uniform refinement, and the
+direct extension of the FGJN14 error estimator localises poorly.
+\end{abstract}
+
+\tableofcontents
+
+%======================================================================
+\section{Common discretisation}
+%======================================================================
+
+We consider, in a bounded polygon $\Omega\subset\mathbb{R}^2$,
+\begin{equation}\label{eq:nse}
+\partial_t\bu-\nu\Delta\bu+(\bu\cdot\nabla)\bu+\nabla p=\bff,\qquad \nabla\cdot\bu=0,\qquad \bu(0)=\bu_0,
+\end{equation}
+with Dirichlet data on part of the boundary and, for the flows around a cylinder, the do-nothing condition
+$\nu\partial_{\boldsymbol n}\bu-p\boldsymbol n=\boldsymbol 0$ at the outlet.
+
+\paragraph{Space.} Continuous $P_2$ velocity and continuous $P_1$ pressure on triangles (Taylor--Hood).
+Curved boundaries (the cylinder) are represented isoparametrically: every cell is mapped from the reference
+triangle by the quadratic map defined by its six $P_2$ nodes, with edge midpoints on curved boundary parts placed
+on the exact boundary. Integrals use a collapsed Gauss rule exact for polynomials of degree~7 on the reference
+triangle. The viscous term is in gradient form, the convective term in convective form
+$n(\bw,\bu,\bv)=((\bw\cdot\nabla)\bu,\bv)$ unless the skew-symmetric form
+$\frac12[((\bw\cdot\nabla)\bu,\bv)-((\bw\cdot\nabla)\bv,\bu)]$ is stated.
+
+\paragraph{Meshes.} Unit square: $2\times2$ squares, two triangles each with alternating diagonals, uniformly
+refined; level $\ell$ has mesh width $h=\sqrt2\,2^{-(\ell+1)}$. Cylinder channel $(0,2.2)\times(0,0.41)$ minus the
+disc of radius $0.05$ at $(0.2,0.2)$: a transfinite O-grid around the cylinder and a Cartesian block downstream,
+split into triangles and refined uniformly; levels 1, 2, 3 have 5\,082, 19\,668, 77\,352 unknowns. The front and back
+points of the cylinder are mesh vertices on every level.
+
+\paragraph{Linear algebra.} Sparse direct solver: PARDISO (via \code{pypardiso}) when installed, SciPy's SuperLU
+otherwise. PARDISO perturbs small pivots of the saddle-point matrices; every solve therefore checks
+$\|b-Ax\|_2\le10^{-12}\|b\|_2$, refines iteratively up to three times with the cached factorisation and falls back
+to SuperLU (Sect.~\ref{sec:pardiso}).
+
+%======================================================================
+\part{\texorpdfstring{$\theta$}{theta}-schemes after John (2016), Chapter 7}
+%======================================================================
+
+\section{Implementation}
+
+Module \code{theta\_th.solver}, class \code{ThetaTH}. One substep from $t_k$ to $t_{k+1}=t_k+\dt_{k+1}$ inside the
+macro step of length $\dt_{n+1}$ is the variational problem~\cite[(7.84)]{John2016}:
+\begin{align*}
+(\bu_{k+1},\bv)&+\theta_1\dt_{n+1}\big[\nu(\nabla\bu_{k+1},\nabla\bv)+n(\bu_{k+1},\bu_{k+1},\bv)\big]
+-\dt_{k+1}(\nabla\cdot\bv,p_{k+1})\\
+&=(\bu_k,\bv)-\theta_2\dt_{n+1}\big[\nu(\nabla\bu_k,\nabla\bv)+n(\bu_k,\bu_k,\bv)\big]
++\theta_3\dt_{n+1}(\bff_k,\bv)+\theta_4\dt_{n+1}(\bff_{k+1},\bv),\\
+0&=\dt_{k+1}(\nabla\cdot\bu_{k+1},q),
+\end{align*}
+with the divergence constraint scaled by $\dt_{k+1}$ as in all simulations of~\cite{John2016} (Remark 7.50).
+The book prints ``$2\nu$'' in the $\theta_2$ term of (7.84); (7.80)--(7.83) and (7.85) have $\nu$, which is used here.
+The parameters $\theta_1,\dots,\theta_4$ are those of Tables 7.1 and 7.2 (module \code{theta\_th.schemes}):
+backward Euler, Crank--Nicolson, the general one-step $\theta$-scheme, and the fractional-step schemes FS0 and FS1
+with $\theta=1-\sqrt2/2$, $\tilde\theta=1-2\theta$, $\tau=\tilde\theta/(1-\theta)$, $\eta=1-\tau$.
+
+Nonlinear solvers: Picard iteration (7.85) and Newton's method (7.86), initial iterate $(\bu_k,p_k)$, stopped when
+the Euclidean norm of the residual of (7.84) on the non-Dirichlet rows is below $10^{-10}$; IMEX variants
+(Remark 7.61) with the constant extrapolation $\bu_{\rm prev}=\bu_k$ or the linear extrapolation (7.89), the explicit
+$\theta_2$ term using the convection field of the previous step as in (7.91).
+
+\paragraph{Verification (unit tests, \code{tests/test\_ns2d\_theta\_th.py}).}
+Tables 7.1/7.2 reproduced; stability functions $R(z)$ with $R(z)-e^z=O(z^{p+1})$, $R(-\infty)=-1$ (CN), $0$ (BE),
+$-\eta/\tau\approx-0.71$ (FS0); exactness for a steady $P_2/P_1$ solution; time orders 1 (BE) and 2 (CN, FS0, FS1)
+for a solution in the discrete space; IMEX orders 2 (linear) and 1 (constant extrapolation); quadratic convergence of
+Newton's method.
+
+\section{Example D.5: steady flow around a cylinder (validation)}
+
+Re $=20$, inflow $1.2\,y(0.41-y)/0.41^2$, do-nothing outflow, drag and lift by the volume formulas (D.16), (D.17).
+
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{rrrrrr}
+\toprule
+level & unknowns & $c_d-c_{d,\rm ref}$ & $c_l-c_{l,\rm ref}$ & $\Delta p-\Delta p_{\rm ref}$ & Newton steps\\
+\midrule
+0 & 1\,353 & $+3.5\cdot10^{-2}$ & $+8.0\cdot10^{-2}$ & $+4.0\cdot10^{-3}$ & 5\\
+1 & 5\,082 & $-9.7\cdot10^{-4}$ & $-5.2\cdot10^{-4}$ & $+6.1\cdot10^{-4}$ & 5\\
+2 & 19\,668 & $-2.4\cdot10^{-4}$ & $-1.6\cdot10^{-4}$ & $+2.1\cdot10^{-4}$ & 5\\
+3 & 77\,352 & $-1.7\cdot10^{-5}$ & $-1.2\cdot10^{-5}$ & $+5.9\cdot10^{-5}$ & 5\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+References (D.19), (D.21), (D.22): $c_d=5.57953523384$, $c_l=0.010618948146$ (do-nothing), $\Delta p=0.11752016697$.
+
+\section{Example D.7: smooth solution, convergence}
+
+$\Omega=(0,1)^2$, $\bu=2\pi\sin t\,(\sin^2(\pi x)\sin(\pi y)\cos(\pi y),\,-\sin(\pi x)\cos(\pi x)\sin^2(\pi y))$,
+$p=20\sin t\,(x^2y-1/6)$, homogeneous Dirichlet data, $\nu=10^{-2}$, $T=1$.
+
+\paragraph{Space} (FS0, $\dt=0.005$). The column ``$p$ shifted'' compares $p_h$ with $p$ at the time the last
+substep's pressure approximates, $t_{k+1}-(1-\theta_1/(\theta_1+\theta_2))\dt_{k+1}$.
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{rllllllll}
+\toprule
+level & $\|\bu-\bu_h\|_0$ & rate & $\|\nabla(\bu-\bu_h)\|_0$ & rate & $\|p-p_h\|_0$ at $T$ & rate & $p$ shifted & rate\\
+\midrule
+0 & 4.30e-1 & & 6.34 & & 6.07e-1 & & 6.07e-1 &\\
+1 & 1.31e-1 & 1.72 & 3.22 & 0.98 & 1.60e-1 & 1.93 & 1.59e-1 & 1.93\\
+2 & 1.61e-2 & 3.02 & 0.822 & 1.97 & 2.81e-2 & 2.51 & 2.81e-2 & 2.51\\
+3 & 1.98e-3 & 3.02 & 0.195 & 2.07 & 6.53e-3 & 2.11 & 6.39e-3 & 2.13\\
+4 & 2.23e-4 & 3.15 & 0.0436 & 2.16 & 2.00e-3 & 1.71 & 1.52e-3 & 2.07\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+Observed: the optimal Taylor--Hood rates 3, 2, 2. The dip of the pressure rate at $T$ on level 4 is the first-order
+temporal pressure error of FS0 at $t_{n+1}$; it disappears at the shifted time.
+
+\paragraph{Time} (level 4). Velocity error at $T$ against the same scheme with $\dt=1/640$ on the same mesh (temporal
+error only):
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lllllllll}
+\toprule
+$\dt$ & BE & rate & CN & rate & FS0 & rate & FS1 & rate\\
+\midrule
+0.2 & 7.39e-2 & & 4.07e-3 & & 4.85e-4 & & 1.87e-3 &\\
+0.1 & 3.65e-2 & 1.02 & 1.02e-3 & 2.00 & 1.20e-4 & 2.01 & 2.67e-4 & 2.81\\
+0.05 & 1.80e-2 & 1.03 & 2.54e-4 & 2.00 & 3.00e-5 & 2.01 & 5.38e-5 & 2.31\\
+0.025 & 8.68e-3 & 1.05 & 6.32e-5 & 2.00 & 7.47e-6 & 2.01 & 1.29e-5 & 2.06\\
+0.0125 & 4.05e-3 & 1.10 & 1.56e-5 & 2.02 & 1.85e-6 & 2.02 & 3.10e-6 & 2.06\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+Observed: orders 1 (BE) and 2 (CN, FS0, FS1). Against the exact solution all second-order schemes level off at
+$2.23\cdot10^{-4}$, the spatial error of level 4. The pressure is of first order at $t_{n+1}$ for every scheme
+(Remark 7.50); the Crank--Nicolson pressure compared at $t_n+\dt/2$ converges with order 2 down to the spatial floor
+$\approx1.5\cdot10^{-3}$; the FS0 pressure at $t_{n+1}-\eta\theta\dt$ is at the spatial floor already for $\dt=0.1$
+(observed, no explanation proved); the FS1 pressure stays of first order there (plausibly because its last substep
+evaluates $\bff$ only at the old time, $\theta_4=0$; not verified).
+
+\section{Example 7.44: pressure error with Crank--Nicolson}
+
+Book: $Q_2/P_1^{\rm disc}$, $\dt=10^{-4}$, $T=5$. Here: Taylor--Hood $P_2/P_1$, Crank--Nicolson with $\dt=10^{-3}$, $T=5$,
+the discrete norm $\big(\dt\sum_n\|p(t)-p_h^n\|_0^2\big)^{1/2}$ with $p$ evaluated at $t_n$ or at $t_n-\dt/2$.
+
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{rllllllll}
+\toprule
+& \multicolumn{4}{c}{$\nu=1$} & \multicolumn{4}{c}{$\nu=10^{-2}$}\\
+level & at $t_n$ & rate & at $t_n-\dt/2$ & rate & at $t_n$ & rate & at $t_n-\dt/2$ & rate\\
+\midrule
+0 & 1.65 & & 1.65 & & 1.25 & & 1.25 &\\
+1 & 0.754 & 1.13 & 0.754 & 1.13 & 0.319 & 1.96 & 0.319 & 1.96\\
+2 & 8.71e-2 & 3.11 & 8.71e-2 & 3.11 & 5.45e-2 & 2.55 & 5.44e-2 & 2.55\\
+3 & 1.42e-2 & 2.62 & 1.39e-2 & 2.65 & 1.27e-2 & 2.10 & 1.24e-2 & 2.14\\
+4 & 4.28e-3 & 1.73 & 3.01e-3 & 2.20 & 4.23e-3 & 1.59 & 2.94e-3 & 2.07\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+Observed (convective form): second order when the Crank--Nicolson pressure is compared at the midpoint, as in Fig.~7.2
+of the book, and errors nearly independent of $\nu$ for $\nu\in\{1,10^{-2}\}$. Comparing at $t_n$ adds a temporal error
+$\approx\frac{\dt}{2}\|\partial_tp\|$ that dominates on level 4.
+
+For $\nu=10^{-4}$ the unstabilised scheme with the convective form blows up on level 1 ($\|\bu_h\|$ grows to 15 at
+$t\approx2.5$, Newton then fails); the convective form is not energy stable for the only weakly divergence-free
+Taylor--Hood velocity (plausible cause, not proved). With the skew-symmetric form the computation is stable, but the
+pressure error stays large: 1.25, 7.18, 4.07, 3.85 on levels 0--3 (level 4 was not completed within the 2\,h limit
+of the runs). The book's observation that the pressure error does not depend on $\nu$ does not hold for this
+discretisation at $\nu=10^{-4}$ on these meshes.
+
+\section{Example 7.57 in two dimensions: Picard iteration vs Newton's method}
+
+The book's Example 7.57 is three-dimensional (Example D.10). Here: Example D.7, $\nu=10^{-3}$, Crank--Nicolson with
+$\dt=0.01$ on $[0,0.1]$, solution of the previous time as initial iterate, stopping tolerance $10^{-10}$, direct solver.
+
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{rrlrrl}
+\toprule
+level & unknowns & method & linear systems (10 steps) & solve time [s] & $\|\bu(T)-\bu_h\|_0$\\
+\midrule
+2 & 659 & Picard & 29 & 0.27 & 2.406e-3\\
+2 & 659 & Newton & 20 & 0.17 & 2.406e-3\\
+3 & 2\,467 & Picard & 28 & 0.81 & 6.369e-4\\
+3 & 2\,467 & Newton & 20 & 1.42 & 6.369e-4\\
+4 & 9\,539 & Picard & 27 & 4.15 & 1.262e-4\\
+4 & 9\,539 & Newton & 20 & 3.56 & 1.262e-4\\
+5 & 37\,507 & Picard & 26 & 15.97 & 1.714e-5\\
+5 & 37\,507 & Newton & 20 & 11.40 & 1.714e-5\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+As in Table 7.3 of the book, Newton's method needs fewer linear systems (two per step instead of about three). The
+timings were taken on a shared machine and include the residual checks of the solver; they are indicative only.
+
+\section{Example 7.58: flow around a cylinder with time-dependent inflow (Example D.9)}
+
+$\nu=10^{-3}$, inflow $\sin(\pi t/8)\,6y(0.41-y)/0.41^2$ on $[0,8]$, $\bu_0=\boldsymbol0$, do-nothing outflow as in
+Example 7.58, level 2 (19\,668 unknowns), Newton's method, tolerance $10^{-10}$. The book uses $Q_2/P_1^{\rm disc}$ on
+levels 3--5 (37\,216 to 588\,160 unknowns).
+
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lrrrrrr}
+\toprule
+scheme, $\dt$ & $c_{d,\max}$ & $t$ & $c_{l,\max}$ & $t$ & $\Delta p(8)$ & linear solves\\
+\midrule
+BE, 0.02 & 2.950769 & 3.9320 & 0.001159 & -- & $-0.126729$ & 800\\
+BE, 0.01 & 2.950513 & 3.9319 & 0.023069 & 7.3443 & $-0.124637$ & 1\,600\\
+BE, 0.005 & 2.950404 & 3.9320 & 0.166381 & 6.3505 & $-0.107584$ & 3\,200\\
+CN, 0.02 & 2.950700 & 3.9418 & 0.444633 & 5.7997 & $-0.098212$ & 948\\
+CN, 0.01 & 2.950758 & 3.9382 & 0.462118 & 5.7615 & $-0.103691$ & 1\,754\\
+CN, 0.005 & 2.950771 & 3.9363 & 0.466132 & 5.7508 & $-0.105762$ & 3\,200\\
+FS0, 0.02 & 2.950792 & 3.9362 & 0.464448 & 5.7539 & $-0.105187$ & 2\,413\\
+FS0, 0.01 & 2.950784 & 3.9352 & 0.466521 & 5.7483 & $-0.106273$ & 4\,466\\
+FS0, 0.005 & 2.950778 & 3.9347 & 0.466880 & 5.7466 & $-0.106606$ & 7\,257\\
+\midrule
+Table D.3 & 2.950918381 & 3.93625 & 0.47787543 & 5.69250 & $-0.11161567$ &\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+Table D.3 was computed with the Dirichlet outflow (D.29) on fine meshes; the remaining gap of $c_{l,\max}$ is mostly
+spatial. Errors (discrete $l^2(0,8)$) to the FS0 run with $\dt=0.005$ on the same mesh (temporal errors only):
+
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lllll}
+\toprule
+scheme, $\dt$ & $c_d$ & $c_l$ & $\Delta p$ & linear solves\\
+\midrule
+BE, 0.005 & 1.14e-1 & 4.05e-1 & 6.24e-2 & 3\,200\\
+CN, 0.02 & 1.91e-2 & 2.95e-1 & 2.27e-2 & 948\\
+CN, 0.01 & 8.13e-3 & 8.61e-2 & 9.24e-3 & 1\,754\\
+CN, 0.005 & 3.39e-3 & 2.41e-2 & 3.66e-3 & 3\,200\\
+FS0, 0.02 & 3.48e-3 & 4.23e-2 & 4.07e-3 & 2\,413\\
+FS0, 0.01 & 1.10e-3 & 9.69e-3 & 1.22e-3 & 4\,466\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+Observed, as in the book: backward Euler is by far the least accurate and misses the vortex shedding for
+$\dt\ge0.005$ (Fig.~\ref{fig:d9}, cf.\ Fig.~7.5); Crank--Nicolson converges with order about two; FS0 is 5--9 times more
+accurate than Crank--Nicolson at equal $\dt$ and still 2--2.5 times more accurate at comparable cost (the reference is
+FS0 itself, which favours FS0; against a Crank--Nicolson reference the ordering is the same). The book reports a slightly
+better accuracy per CPU time for Crank--Nicolson (Remark 7.59, John and Rang 2010); that is not reproduced here, which
+depends on the solver.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/d9_L2_lift.png}\\[1ex]
+\includegraphics[width=\textwidth]{figures/d9_L2_error_lift.png}
+\caption{Example 7.58 / D.9, level 2: lift coefficient (top) and its error to the FS0 run with $\dt=0.005$ (bottom).}
+\label{fig:d9}
+\end{figure}
+
+\section{Example 7.62: IMEX schemes (Example D.8)}
+
+Re $=100$, steady inflow $6y(0.41-y)/0.41^2$, spin-up with Crank--Nicolson ($\dt=0.01$) to $t=15$, then two time units
+with Crank--Nicolson, $\dt=0.005$, level 2.
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lrrrrr}
+\toprule
+method & $c_{d,\max}$ & $c_{l,\max}$ & St & $\Delta p(t_0+T/2)$ & linear solves\\
+\midrule
+fully implicit (Newton) & 3.2222 & 0.9841 & 0.2984 & 2.4858 & 800\\
+IMEX, linear extrapolation & 3.2341 & 1.0052 & 0.3008 & 2.4930 & 400\\
+IMEX, constant extrapolation & 3.4010 & 1.5833 & 0.2857 & 2.5892 & 400\\
+\midrule
+Table D.2 & [3.22, 3.24] & [0.98, 1.02] & [0.295, 0.305] & [2.46, 2.50] &\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+Observed, as in Fig.~7.10: the constant extrapolation is quite inaccurate (and its amplitude still grows), the linear
+extrapolation gives almost the same results as the fully implicit scheme with half the linear solves; both lie inside
+all four reference intervals on level 2. On level 1 (5\,082 unknowns) the flow is not resolved (St $\approx0.27$).
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/d8_L2_qoi.png}
+\caption{Example 7.62 / D.8, level 2: drag, lift and pressure difference; dotted: reference intervals of Table D.2.}
+\end{figure}
+
+%======================================================================
+\part{Adaptive SUPG for Navier--Stokes (extension of FGJN14)}
+%======================================================================
+
+\section{Discretisation}
+
+Module \code{theta\_th.supg}, class \code{SUPGTH}. With the transport field $\bw=\bu_h$ (fully nonlinear) and the
+discrete time derivative $\bu_h'$,
+\begin{multline*}
+(\bu_h',\bv)+\nu(\nabla\bu_h,\nabla\bv)+((\bw\cdot\nabla)\bu_h,\bv)-(p_h,\nabla\cdot\bv)\\
++\sum_K\delta_K\big(\bu_h'-\nu\Delta\bu_h+(\bw\cdot\nabla)\bu_h+\nabla p_h-\bff,(\bw\cdot\nabla)\bv\big)_K=(\bff,\bv),
+\qquad(\nabla\cdot\bu_h,q)=0.
+\end{multline*}
+The pressure gradient is part of the consistent residual; there is \emph{no} pressure stabilisation (no PSPG, no
+grad-div): Taylor--Hood is inf-sup stable. Time: the trapezoidal rule with the discrete derivative as in~\cite{FGJN14},
+Sect.~3.3, $\bu_{n+1}=\bu_n+\frac{\dt}2(\bu_n'+\bu_{n+1}')$, the equation collocated at $t_{n+1}$; with $\delta_K=0$ this
+is algebraically Crank--Nicolson (reproduced to all digits). Stabilisation parameter (a choice of this implementation;
+\cite{FGJN14} use $\delta_0h_K/\|\boldsymbol b\|_{\infty,K}$):
+\[
+\delta_K=\delta_0\min\big\{h_K/\|\bw_0\|_{\infty,K},\,h_K^2/\nu\big\},\qquad\delta_0=0.25,
+\]
+computed from the initial iterate $\bw_0=\bu_n+\dt\,\bu_n'$ of the step and kept fixed in the nonlinear iteration.
+Newton's method with the full Jacobian (Galerkin convection and both SUPG derivatives
+$\delta_K((\delta\bu\cdot\nabla)\bu,(\bu\cdot\nabla)\bv)$ and $\delta_K(R(\bu),(\delta\bu\cdot\nabla)\bv)$), an Armijo line
+search and a Picard fallback; stopping criterion $\|r\|_2\le10^{-8}+10^{-10}\|b\|_2$.
+
+\paragraph{Verification (\code{tests/test\_ns2d\_adaptive\_supg\_th.py}).} A steady $P_2/P_1$ solution is reproduced to
+round-off for $\delta_0\in\{0,0.25,5\}$ (consistency); Newton's method converges quadratically; the transfer between
+meshes is exact under refinement; all residuals vanish for a discrete solution.
+
+\section{Adaptive algorithm}
+
+Module \code{theta\_th.adaptive}, class \code{AdaptiveSUPGNS}, following the steps of~\cite{FGJN14}, Sect.~3.3, as
+implemented for convection--diffusion in \code{galerkit.convection\_diffusion.adaptive\_supg} (the PDF of~\cite{FGJN14}
+was not at hand; details of its p.~227 not covered there may differ). After every accepted time step:
+\begin{enumerate}
+\item TR step; step size by the TR-AB2 controller of Gresho, Griffiths and Silvester: AB2 predictor,
+  $d=(\bu-\bu^p)/(3(1+\dt_{\rm old}/\dt))$ in the $L^2$ norm of the velocity, $\dt_{\rm new}=0.85\dt({\rm tol}_t/\|d\|)^{1/3}$,
+  rejection if $\|d\|>{\rm tol}_t/0.7^3$, averaging every 10 steps, $\dt_0=10^{-10}$;
+\item local indicators $\eta_K$ (an \code{ErrorIndicator});
+\item marking (a \code{Marking}): FGJN14 thresholds ($\eta_K>{\rm TOL}_1$ refine, $\eta_K<{\rm TOL}_2={\rm TOL}_1/20$ coarsen) or
+  D\"orfler marking (below);
+\item newest-vertex bisection and its exact inverse;
+\item transfer of $\bu_h$ by interpolation (exact under refinement).
+\end{enumerate}
+Additions needed for Navier--Stokes (each documented in the code with the failure it prevents):
+(i) after a mesh change $\bu_h'$ and $p_h$ are recomputed from the discrete equation (an interpolated $\bu_h'$ violates it
+by $O(1)$; 325 rejections in 4 accepted steps were observed); (ii) the step may grow by at most a factor 10 (from
+$\dt_0=10^{-10}$ the predictor is exact and the unlimited formula proposed $\dt\approx10^{88}$); (iii) the nonlinear
+iteration starts from the predictor, and a failed step is repeated with $\dt/2$; (iv) $\delta_K$ is computed from the
+predictor ($\bu(0)=\boldsymbol0$ in Example D.7 gave $\delta_K=\delta_0h^2/\nu\approx80$ otherwise).
+
+\paragraph{Error indicators, designed to be extended.} All residual indicators share
+\[
+R_K=\bff-\bu_h'+\nu\Delta\bu_h-(\bu_h\cdot\nabla)\bu_h-\nabla p_h,\qquad
+R_E=-\nu[\![\partial_{\boldsymbol n}\bu_h]\!],\qquad R_{\rm div}=\nabla\cdot\bu_h,
+\]
+and differ in their weights (a \code{Weights} subclass):
+\[
+\eta_K^2=w_K\|R_K\|_K^2+\sum_{E\subset\partial K}w_E\|R_E\|_E^2+w_{{\rm div},K}\|\nabla\cdot\bu_h\|_K^2 .
+\]
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lll}
+\toprule
+name & weights & origin\\
+\midrule
+\code{supg} & $w_K=\min\{h_K^2/\nu,24\delta_K\}+24\delta_K$, $w_E=\min\{24/\|\bu_h\|_{\infty,E},h_E/\nu\}$, $w_{\rm div}=\nu$
+& \cite[(28)]{FGJN14}, $\varepsilon\to\nu$, $\boldsymbol b\to\bu_h$, $c\to0$\\
+\code{h1} & $h_K^2$, $h_E$, $1$ & energy-norm weights\\
+\code{l2} & $h_K^4$, $h_E^3$, $h_K^2$ & $L^2$ weights\\
+\code{exact} & local SUPG-norm error of a known solution & for testing\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+The divergence term is an addition of this extension (Taylor--Hood is only weakly divergence free). A new indicator is a
+new \code{Weights} or \code{ErrorIndicator} subclass registered in \code{INDICATORS}; the marking strategy is exchangeable
+as well, and a separate \code{global\_indicator} may supply the global estimate.
+
+\section{Results for the smooth solution (Example D.7)}
+
+$T=1$, $\delta_0=0.25$, ${\rm tol}_t=10^{-3}$, initial mesh $4\times4$ squares. Error measures at $T$: $\|\bu-\bu_h\|_0$ and
+the SUPG norm $(\nu|\bu-\bu_h|_1^2+\sum_K\delta_K\|(\bu_h\cdot\nabla)(\bu-\bu_h)\|_K^2)^{1/2}$.
+
+\subsection{Uniform meshes and effectivity}
+
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{llll}
+\toprule
+$\nu$, method & $\|\bu-\bu_h\|_0$, levels 1$\to$4 & rates & SUPG norm, levels 1$\to$4\\
+\midrule
+$10^{-2}$, SUPG & 1.22e-1 $\to$ 7.73e-4 & 2.47, 2.50, 2.34 & 6.56e-1 $\to$ 2.11e-2 (rates 1.66, 1.62, 1.68)\\
+$10^{-2}$, Galerkin & 1.31e-1 $\to$ 2.24e-4 & 3.02, 3.02, 3.15 & --\\
+$10^{-4}$, SUPG & 1.60e-1 $\to$ 7.75e-3 & 0.92, 1.39, 2.06 & 6.94e-1 $\to$ 4.75e-2 (rates 1.26, 1.31, 1.30)\\
+$10^{-4}$, Galerkin & 3.05e-1 $\to$ 3.98e-3 & 1.41, 2.08, 2.77 & --\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+(Unknowns on levels 1--4: 188, 660, 2\,468, 9\,540. The ``SUPG norm'' of a Galerkin run lacks the $\delta$ term and is not
+listed.) On these meshes SUPG is less accurate than Galerkin in $L^2$ for this resolved smooth solution, and its SUPG-norm
+rates (1.3--1.7) are below the $h^{k+1/2}=h^{2.5}$ of the theory for convection-dominated problems; whether this is
+pre-asymptotic or an effect of the choice of $\delta_K$ is open.
+
+Effectivity $\eta/\|e\|_{\rm SUPG}$ on uniform meshes (levels 1--4, after 20 steps of $\dt=0.01$):
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{llll}
+\toprule
+$\nu$ & \code{supg} & \code{h1} & \code{l2}\\
+\midrule
+$10^{-2}$ & 11.6, 13.4, 15.6, 17.7 & 5.4, 7.0, 8.0, 8.7 & 1.9, 1.2, 0.7, 0.4\\
+$10^{-4}$ & 10.0, 8.2, 8.5, 9.1 & 6.7, 12.9, 24.5, 41.2 & 2.4, 2.3, 2.2, 1.8\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+The extended FGJN14 estimator is robust in $\nu$ (as reported in~\cite{FGJN14} for convection--diffusion), the \code{h1}
+weights are not.
+
+\subsection{Adaptive runs}
+
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{llrrrlll}
+\toprule
+$\nu$ & marking & cells & unknowns & steps (rej.) & $\|\bu-\bu_h\|_0$ & SUPG norm & max Newton\\
+\midrule
+$10^{-2}$ & \code{supg}, TOL$_1$ 0.04 & 482 & 2\,318 & 43 (0) & 5.92e-3 & 7.72e-2 & 3\\
+$10^{-2}$ & \code{supg}, TOL$_1$ 0.02 & 857 & 4\,093 & 41 (0) & 3.08e-3 & 4.71e-2 & 3\\
+$10^{-2}$ & \code{supg}, TOL$_1$ 0.01 & 1\,569 & 7\,337 & 38 (0) & 1.38e-3 & 2.62e-2 & 3\\
+\midrule
+$10^{-4}$ & \code{supg}, TOL$_1$ 0.04 & 2\,028 & 9\,560 & 74 (3) & 2.20e-2 & 8.27e-2 & 21\\
+$10^{-4}$ & \code{supg}, TOL$_1$ 0.02 & 2\,193 & 10\,270 & 53 (2) & 1.63e-2 & 9.60e-2 & 18\\
+$10^{-4}$ & \code{supg}, TOL$_1$ 0.01 & 4\,027 & 18\,738 & 47 (3) & 1.17e-2 & 5.86e-2 & 30\\
+$10^{-4}$ & \code{exact}, TOL$_1$ 5e-3 & 1\,108 & 5\,160 & 55 (0) & 2.08e-2 & 8.34e-2 & 5\\
+$10^{-4}$ & \code{exact}, TOL$_1$ 2.5e-3 & 2\,303 & 10\,610 & 47 (0) & 1.19e-2 & 5.00e-2 & 8\\
+$10^{-4}$ & \code{exact}, TOL$_1$ 1.25e-3 & 5\,455 & 24\,839 & 47 (0) & 8.76e-3 & 2.94e-2 & 6\\
+$10^{-4}$ & D\"orfler, \code{h1}/\code{supg}, 0.5 & 4\,442 & 20\,413 & 68 (0) & 9.89e-3 & 4.10e-2 & 7\\
+$10^{-4}$ & D\"orfler, \code{h1}/\code{supg}, 0.3 & 7\,583 & 34\,670 & 67 (0) & 8.90e-3 & 2.89e-2 & 7\\
+$10^{-4}$ & D\"orfler, \code{h1}/\code{supg}, 0.2 & 8\,021 & 36\,661 & 67 (0) & 8.84e-3 & 2.70e-2 & 7\\
+\midrule
+$10^{-4}$ & uniform level 4 & 2\,048 & 9\,540 & 100 ($\dt=0.01$) & 7.75e-3 & 4.75e-2 & 3\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+D\"orfler marking (\code{DoerflerMarking}, $\theta=0.3$): if the global \code{supg} estimate exceeds the target, refine the
+smallest set of cells carrying 30\,\% of $\sum m_K^2$, $m_K$ the \code{h1} indicator; in every step the cells carrying the
+smallest 5\,\% are coarsening candidates. The three runs with \code{supg} marking were repeated with the corrected linear
+solver (Sect.~\ref{sec:pardiso}) with unchanged results.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/adaptive_error_vs_dofs.png}
+\caption{Example D.7: error at $T=1$ against the number of unknowns ($\nu=10^{-4}$ top, $10^{-2}$ bottom).}
+\label{fig:adaptive}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/adaptive_meshes_nu1e-4.png}
+\caption{Adaptive meshes at $T=1$, $\nu=10^{-4}$.}
+\end{figure}
+
+\subsection{Diagnosis of the \code{supg} indicator}
+
+On the same SUPG states (uniform levels 3, 4, $t=0.5$) $\eta_K$ was compared cell by cell with the exact local SUPG-norm
+error $e_K$ (\code{diagnose\_indicator.py}). For $\nu=10^{-4}$, level 4:
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lllll}
+\toprule
+weights & effectivity & Spearman($\eta_K,e_K$) & top-10\,\% overlap & slow cells' share of $\eta^2$ (of $e^2$: 0.39)\\
+\midrule
+\code{supg} & 6.6 & 0.41 & 0.62 & 0.85\\
+\code{supg}, $\delta_K$ capped at $\delta_0h_K/U_\infty$ & 2.5 & 0.47 & 0.67 & 0.65\\
+cell weight $h_K^2$, \code{supg} edge & 1.7 & 0.66 & 0.74 & 0.89\\
+edge + divergence terms only & 1.7 & 0.70 & 0.74 & 0.89\\
+\code{h1} & 36.8 & 0.79 & 0.79 & 0.71\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+(``slow'': $\|\bu_h\|_{\infty,K}<0.2$.) For $\nu=10^{-2}$, level 4: \code{supg} effectivity 14.7, Spearman 0.51, top-10\,\%
+overlap 0.21; \code{h1} 7.95, 0.97, 0.76. At $\nu=10^{-4}$ the cell part of $\eta^2$ is 37--41 times $\sum e_K^2$, the edge
+part 0.2--2.7 times, the divergence part at most 0.14 times.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/diagnosis_maps_nu1e-4_L4.png}
+\caption{$\nu=10^{-4}$, level 4, $t=0.5$: exact local error, \code{supg} indicator, their ratio, cell and edge parts,
+local velocity (all $\log_{10}$).}
+\end{figure}
+
+\section{Observations}
+
+\begin{enumerate}
+\item \textbf{The cell weight of the extended FGJN14 estimator is unbounded where $\bu_h\to0$.} With
+  $\delta_K=\delta_0h_K/\|\bu_h\|_{\infty,K}$ the weight $\min\{h_K^2/\nu,24\delta_K\}+24\delta_K\approx48\delta_K$ grows like
+  $h_K/|\bu_h|$; $\delta_K/h_K$ reaches 65 near walls and vortex centres. In~\cite{FGJN14} the convection $\boldsymbol b$ is
+  given and typically bounded away from zero; in Navier--Stokes it is not. At $\nu=10^{-4}$, level 4, cells with
+  $\|\bu_h\|_{\infty,K}<0.05$ carry 44\,\% of $\eta^2$ and 5.5\,\% of $e^2$. The estimator is robust globally but ranks the
+  cells poorly; this explains its poor adaptive meshes (non-monotone errors, up to 30 Newton iterations).
+\item \textbf{Marking and global estimate must be separated.} The \code{h1} indicator ranks the cells best but its magnitude
+  is not robust in $\nu$; with D\"orfler marking on \code{h1} and the \code{supg} global estimate the adaptive runs at
+  $\nu=10^{-4}$ behave as intended (monotone errors, no rejections, at most 7 Newton iterations). The control run with
+  D\"orfler marking on \code{supg} collapsed: its 5\,\% ``smallest'' cells are the fast-flow cells, where the error is; the
+  mesh was coarsened there (157 $\to$ 45 cells), the error grew from 0.15 to 0.28, the estimate exploded to $\sim10^5$ and the
+  step size to $\sim10^{-10}$ near $t=0.414$.
+\item \textbf{On the smooth solution adaptivity does not pay off.} At $\nu=10^{-4}$ the exact indicator reaches the uniform
+  level-4 SUPG-norm error at similar cost and beats it at 2.6 times the unknowns; \code{h1}/D\"orfler needs about 1.4 times
+  the unknowns of the exact indicator. This is expected for a smooth solution and says nothing about problems with layers.
+\item \textbf{Probable time-error floor.} The adaptive $L^2$ errors at $\nu=10^{-4}$ level off near $9\cdot10^{-3}$ while the
+  unknowns double (Fig.~\ref{fig:adaptive}); the adaptive runs take 47--68 steps (${\rm tol}_t=10^{-3}$) against 100 fixed
+  steps for the uniform runs. A rerun with ${\rm tol}_t=10^{-4}$ would settle this; not done.
+\item \textbf{SUPG vs Galerkin.} For this resolved smooth solution SUPG is less accurate than Galerkin in $L^2$
+  on uniform meshes, and its SUPG-norm rates are below theory; open (pre-asymptotic behaviour or the choice of $\delta_K$).
+\end{enumerate}
+
+\section{A solver artefact: inaccurate PARDISO solves}\label{sec:pardiso}
+
+With PARDISO, the adaptive run with the exact indicator and TOL$_1=1.25\cdot10^{-3}$, executed as the third run in one
+process, ended with a SUPG-norm error of 0.20 instead of 0.029; the error jumped tenfold in the last steps. With SuperLU,
+the same sequence gives 0.029 (identical to a standalone run), and the first two runs agree to all printed digits. On the
+mass/divergence saddle-point system solved after each mesh change, PARDISO's relative residual was $8.5\cdot10^{-10}$
+against $2\cdot10^{-14}$ for SuperLU. The residual-checked solve (iterative refinement, SuperLU fallback) restores the
+SuperLU result exactly; in that run 54 refinements and one fallback occurred in 589 solves. Which mechanism inside PARDISO
+(pivot perturbation or reused state) causes the inaccuracy was not established. With \code{pypardiso} installed, six
+existing tests of older galerkit modules also fail (precision), independently of this work.
+
+\section{Summary}
+
+Part~I reproduces the qualitative findings of~\cite{John2016}, Sect.~7.3.1, with Taylor--Hood $P_2/P_1$: optimal spatial
+rates for the smooth solution, temporal orders 1/2/2/2 for BE/CN/FS0/FS1, the pressure time levels of Remark~7.50, the
+inaccuracy of backward Euler and the higher accuracy of FS0 for the flow around a cylinder, Newton needing fewer linear
+systems than Picard, and the IMEX results of Example~7.62. Deviations: the element, coarser meshes, and the failure of the
+unstabilised scheme at $\nu=10^{-4}$ in Example~7.44.
+
+Part~II gives a verified SUPG--Taylor--Hood discretisation with the trapezoidal rule and an adaptive algorithm with
+exchangeable indicators and marking strategies. The adaptive loop works with the exact indicator and with \code{h1}
+ranking + \code{supg} global estimate; the direct extension of the FGJN14 estimator localises poorly because its cell weight
+is unbounded where the velocity vanishes. Next steps: rerun with ${\rm tol}_t=10^{-4}$; a test problem with layers, where
+adaptivity can pay off; an analysis of a cell weight that stays bounded for $\bu_h\to0$.
+
+\paragraph{Reproduction.} {\sloppy Code and scripts: galerkit, branch \code{time-navier-stokes},
+\code{examples/\allowbreak navier\_stokes/\allowbreak 2d/\allowbreak theta\_john2016} (\code{d5\_steady.py}, \code{d7\_convergence.py}, \code{picard\_newton.py},
+\code{d9\_cylinder.py}, \code{d8\_imex.py}) and \code{examples/\allowbreak navier\_stokes/\allowbreak 2d/\allowbreak adaptive\_supg\_ns} (\code{adaptive\_d7.py},
+\code{diagnose\_indicator.py}, \code{plot\_summary.py}); each script has \code{--smoke} and documents its options.\par}
+
+\begin{thebibliography}{9}
+\bibitem{John2016} V.~John, \emph{Finite Element Methods for Incompressible Flow Problems}, Springer Series in
+Computational Mathematics 51, Springer, 2016.
+\bibitem{FGJN14} J.~de Frutos, B.~Garc\'{\i}a-Archilla, V.~John, J.~Novo, An adaptive SUPG method for evolutionary
+convection--diffusion equations, \emph{Comput. Methods Appl. Mech. Engrg.} 273 (2014) 219--237.
+\end{thebibliography}
+
+\end{document}
