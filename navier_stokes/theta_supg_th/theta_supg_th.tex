@@ -30,11 +30,15 @@ John~\cite{John2016}, Sect.~7.3.1, without any stabilisation, together with the 
 (Examples 7.44, 7.57 in two dimensions, 7.58 and 7.62, based on Examples D.5, D.7, D.8, D.9 of Appendix~D).
 Part~II extends the adaptive SUPG method of de Frutos, Garc\'{\i}a-Archilla, John and Novo~\cite{FGJN14}
 from evolutionary convection--diffusion--reaction equations to the Navier--Stokes equations, with the
-inf-sup stable Taylor--Hood pair (no pressure stabilisation), and reports first simulations for the smooth
-solution of Example D.7. All rates and comparisons below are \emph{observed numerically}; nothing in this
-report is a proof. The verdict for Part~II is that the implementation is verified and the adaptive loop works,
-but on the smooth test problem no adaptive variant is more efficient than uniform refinement, and the
-direct extension of the FGJN14 error estimator localises poorly.
+inf-sup stable Taylor--Hood pair (no pressure stabilisation), and reports simulations for the smooth
+solution of Example D.7 and for a manufactured solution with boundary layers of width $\sqrt\nu$.
+All rates and comparisons below are \emph{observed numerically}; nothing in this report is a proof.
+The verdict for Part~II: the implementation is verified; the direct extension of the FGJN14 error estimator is
+robust globally but localises poorly, and its absolute local thresholds do not control the global error.
+Adaptivity does not pay off on the smooth solution or for layers of width 0.01, but for layers of width 0.001
+($\nu=10^{-6}$) the combination of an $h^1$-type indicator for the ranking, the FGJN14-type estimator for the
+global error and D\"orfler marking beats uniform refinement (2.7--2.9 times smaller $L^2$ error with fewer
+unknowns).
 \end{abstract}
 
 \tableofcontents
@@ -326,7 +330,10 @@ is algebraically Crank--Nicolson (reproduced to all digits). Stabilisation param
 computed from the initial iterate $\bw_0=\bu_n+\dt\,\bu_n'$ of the step and kept fixed in the nonlinear iteration.
 Newton's method with the full Jacobian (Galerkin convection and both SUPG derivatives
 $\delta_K((\delta\bu\cdot\nabla)\bu,(\bu\cdot\nabla)\bv)$ and $\delta_K(R(\bu),(\delta\bu\cdot\nabla)\bv)$), an Armijo line
-search and a Picard fallback; stopping criterion $\|r\|_2\le10^{-8}+10^{-10}\|b\|_2$.
+search and a Picard fallback. Stopping criterion: $\|r\|_2\le10^{-10}$ for the residual with the momentum rows scaled by
+$\dt/2$ (velocity units, independent of $\dt$). A first version used the unscaled residual with a relative tolerance;
+because of the factor $2/\dt\approx10^{10}$ for tiny steps it accepted unsolved iterates (found with the boundary-layer
+problem, Sect.~\ref{sec:layers}).
 
 \paragraph{Verification (\code{tests/test\_ns2d\_adaptive\_supg\_th.py}).} A steady $P_2/P_1$ solution is reproduced to
 round-off for $\delta_0\in\{0,0.25,5\}$ (consistency); Newton's method converges quadratically; the transfer between
@@ -353,6 +360,20 @@ by $O(1)$; 325 rejections in 4 accepted steps were observed); (ii) the step may 
 $\dt_0=10^{-10}$ the predictor is exact and the unlimited formula proposed $\dt\approx10^{88}$); (iii) the nonlinear
 iteration starts from the predictor, and a failed step is repeated with $\dt/2$; (iv) $\delta_K$ is computed from the
 predictor ($\bu(0)=\boldsymbol0$ in Example D.7 gave $\delta_K=\delta_0h^2/\nu\approx80$ otherwise).
+Three further additions were found with the boundary-layer problem of Sect.~\ref{sec:layers}, where $\bu_0\neq\boldsymbol0$:
+(v) the initial velocity and every velocity transferred to a new mesh are $L^2$-projected onto the discretely
+divergence-free subspace (the $P_2$ interpolant of $\bu_0$ has $\|B\bu_0\|=0.046$; the first TR step then projects it, a
+jump independent of $\dt$ that the TR-AB2 estimate rejects for every step size, and the run stalled at
+$\dt\approx10^{-10}$); (vi) the $\dt$-independent stopping criterion of the previous section; (vii) the initial mesh is
+adapted to $\bu_0$, by refinement only, until the global estimate of $\bu_0$ is below the target of the marking (errors
+made on a too coarse initial mesh are carried along at small $\nu$ and are not removed by later refinement; with only 8
+initial passes the global error stalled at $3.9\cdot10^{-2}$ on 47\,000 cells, and with coarsening allowed the initial
+passes cycled between 80 and 82 cells).
+
+\paragraph{Marking.} Besides the FGJN14 thresholds, \code{DoerflerMarking}: if the global estimate (of the marking
+indicator or of a separate \code{global\_indicator}) exceeds a target, refine the smallest set of cells carrying the
+fraction $\theta$ of $\sum_K m_K^2$; cells carrying together the smallest fraction of $\sum_Km_K^2$ (default 5\,\%, 0 = no
+coarsening) are coarsening candidates. It uses only the ranking of $m_K$.
 
 \paragraph{Error indicators, designed to be extended.} All residual indicators share
 \[
@@ -373,6 +394,7 @@ name & weights & origin\\
 \code{h1} & $h_K^2$, $h_E$, $1$ & energy-norm weights\\
 \code{l2} & $h_K^4$, $h_E^3$, $h_K^2$ & $L^2$ weights\\
 \code{exact} & local SUPG-norm error of a known solution & for testing\\
+\code{exact\_l2} & local $L^2$ velocity error of a known solution & for testing\\
 \bottomrule
 \end{tabular}
 \end{adjustbox}\end{center}
@@ -420,33 +442,39 @@ weights are not.
 
 \subsection{Adaptive runs}
 
+The table shows the runs with all additions (i)--(vii) (re-run after the boundary-layer study; the uniform, effectivity and
+time-adaptivity results did not change).
 \begin{center}\begin{adjustbox}{max width=\textwidth}
 \begin{tabular}{llrrrlll}
 \toprule
 $\nu$ & marking & cells & unknowns & steps (rej.) & $\|\bu-\bu_h\|_0$ & SUPG norm & max Newton\\
 \midrule
-$10^{-2}$ & \code{supg}, TOL$_1$ 0.04 & 482 & 2\,318 & 43 (0) & 5.92e-3 & 7.72e-2 & 3\\
-$10^{-2}$ & \code{supg}, TOL$_1$ 0.02 & 857 & 4\,093 & 41 (0) & 3.08e-3 & 4.71e-2 & 3\\
-$10^{-2}$ & \code{supg}, TOL$_1$ 0.01 & 1\,569 & 7\,337 & 38 (0) & 1.38e-3 & 2.62e-2 & 3\\
+$10^{-2}$ & \code{supg}, TOL$_1$ 0.04 & 478 & 2\,300 & 45 (0) & 5.88e-3 & 7.65e-2 & 3\\
+$10^{-2}$ & \code{supg}, TOL$_1$ 0.02 & 866 & 4\,131 & 44 (0) & 3.10e-3 & 4.68e-2 & 3\\
+$10^{-2}$ & \code{supg}, TOL$_1$ 0.01 & 1\,594 & 7\,457 & 41 (0) & 1.36e-3 & 2.60e-2 & 3\\
+$10^{-2}$ & \code{exact}, TOL$_1$ 5e-3 / 2.5e-3 / 1.25e-3 & 525 / 771 / 1\,181 & 2\,484 / 3\,606 / 5\,466 & 53 / 49 / 44 (0) & 4.95e-3 / 2.60e-3 / 1.65e-3 & 6.07e-2 / 3.66e-2 / 2.75e-2 & 3\\
 \midrule
-$10^{-4}$ & \code{supg}, TOL$_1$ 0.04 & 2\,028 & 9\,560 & 74 (3) & 2.20e-2 & 8.27e-2 & 21\\
-$10^{-4}$ & \code{supg}, TOL$_1$ 0.02 & 2\,193 & 10\,270 & 53 (2) & 1.63e-2 & 9.60e-2 & 18\\
-$10^{-4}$ & \code{supg}, TOL$_1$ 0.01 & 4\,027 & 18\,738 & 47 (3) & 1.17e-2 & 5.86e-2 & 30\\
-$10^{-4}$ & \code{exact}, TOL$_1$ 5e-3 & 1\,108 & 5\,160 & 55 (0) & 2.08e-2 & 8.34e-2 & 5\\
-$10^{-4}$ & \code{exact}, TOL$_1$ 2.5e-3 & 2\,303 & 10\,610 & 47 (0) & 1.19e-2 & 5.00e-2 & 8\\
-$10^{-4}$ & \code{exact}, TOL$_1$ 1.25e-3 & 5\,455 & 24\,839 & 47 (0) & 8.76e-3 & 2.94e-2 & 6\\
-$10^{-4}$ & D\"orfler, \code{h1}/\code{supg}, 0.5 & 4\,442 & 20\,413 & 68 (0) & 9.89e-3 & 4.10e-2 & 7\\
-$10^{-4}$ & D\"orfler, \code{h1}/\code{supg}, 0.3 & 7\,583 & 34\,670 & 67 (0) & 8.90e-3 & 2.89e-2 & 7\\
-$10^{-4}$ & D\"orfler, \code{h1}/\code{supg}, 0.2 & 8\,021 & 36\,661 & 67 (0) & 8.84e-3 & 2.70e-2 & 7\\
+$10^{-4}$ & \code{supg}, TOL$_1$ 0.04 & 697 & 3\,338 & 54 (3) & 4.50e-2 & 1.59e-1 & 22\\
+$10^{-4}$ & \code{supg}, TOL$_1$ 0.02 & 1\,451 & 6\,806 & 63 (2) & 2.23e-2 & 1.20e-1 & 9\\
+$10^{-4}$ & \code{supg}, TOL$_1$ 0.01 & 2\,142 & 10\,048 & 48 (1) & 1.41e-2 & 6.71e-2 & 15\\
+$10^{-4}$ & \code{exact}, TOL$_1$ 5e-3 & 1\,092 & 5\,083 & 55 (0) & 2.10e-2 & 8.27e-2 & 3\\
+$10^{-4}$ & \code{exact}, TOL$_1$ 2.5e-3 & 2\,066 & 9\,541 & 45 (0) & 1.22e-2 & 5.14e-2 & 4\\
+$10^{-4}$ & \code{exact}, TOL$_1$ 1.25e-3 & 4\,514 & 20\,597 & 45 (0) & 8.60e-3 & 3.14e-2 & 4\\
+$10^{-4}$ & D\"orfler, \code{h1}/\code{supg}, 0.5 & 975 & 4\,589 & 59 (0) & 2.77e-2 & 1.36e-1 & 3\\
+$10^{-4}$ & D\"orfler, \code{h1}/\code{supg}, 0.3 & 2\,880 & 13\,344 & 67 (0) & 1.29e-2 & 7.27e-2 & 3\\
+$10^{-4}$ & D\"orfler, \code{h1}/\code{supg}, 0.2 & 3\,918 & 18\,025 & 63 (0) & 9.86e-3 & 4.83e-2 & 3\\
 \midrule
 $10^{-4}$ & uniform level 4 & 2\,048 & 9\,540 & 100 ($\dt=0.01$) & 7.75e-3 & 4.75e-2 & 3\\
 \bottomrule
 \end{tabular}
 \end{adjustbox}\end{center}
-D\"orfler marking (\code{DoerflerMarking}, $\theta=0.3$): if the global \code{supg} estimate exceeds the target, refine the
-smallest set of cells carrying 30\,\% of $\sum m_K^2$, $m_K$ the \code{h1} indicator; in every step the cells carrying the
-smallest 5\,\% are coarsening candidates. The three runs with \code{supg} marking were repeated with the corrected linear
-solver (Sect.~\ref{sec:pardiso}) with unchanged results.
+D\"orfler marking here: $\theta=0.3$, 5\,\% coarsening. Compared with the first version (before additions (v)--(vii)), the
+same tolerances give smaller meshes for $\nu=10^{-4}$, at about the same or slightly better accuracy per unknown; with the
+\code{supg} thresholds the errors now decrease monotonically with TOL$_1$ (before: SUPG norm 8.3e-2, 9.6e-2, 5.9e-2 on
+9\,560, 10\,270, 18\,738 unknowns), and the maximal number of Newton iterations dropped from 30 to 22. A plausible
+explanation, not verified: before addition (v) every transferred velocity carried a spurious divergence residual that
+inflated the estimators right after each mesh change and triggered extra refinement. For $\nu=10^{-2}$ the results are
+practically unchanged.
 
 \begin{figure}[ht]
 \centering
@@ -489,6 +517,86 @@ part 0.2--2.7 times, the divergence part at most 0.14 times.
 local velocity (all $\log_{10}$).}
 \end{figure}
 
+\section{Results for boundary layers of width \texorpdfstring{$\sqrt\nu$}{sqrt(nu)}}\label{sec:layers}
+
+Problem (\code{problems.BoundaryLayer}; the \code{LayerSolution} of galerkit branch \code{kelvin-helmholtz}, ported, $\bff$
+checked against SymPy to $5\cdot10^{-15}$): in $(0,1)^2$, with $\delta=\sqrt\nu$ and $g(t)=1+\frac12\sin(2\pi t)$,
+\begin{gather*}
+L(y)=(1-e^{-y/\delta})(1-e^{-(1-y)/\delta}),\quad m=\int_0^1L,\quad a(y)=L(y)-6my(1-y),\quad Y(y)=\int_0^ya,\\
+\bu=g(t)\big(\sin^2(\pi x)\,a(y),\,-\pi\sin(2\pi x)\,Y(y)\big),\qquad p=g(t)\cos(\pi x)\cos(\pi y).
+\end{gather*}
+$\bu=\boldsymbol0$ on the whole boundary, $\nabla\cdot\bu=0$; $u_1$ rises from 0 to $O(1)$ within $O(\delta)$ of $y=0$ and
+$y=1$, the interior flow is a shear that changes sign; $\bff$ is $O(1)$ uniformly in $\nu$. Settings: $T=0.25$,
+${\rm tol}_t=10^{-4}$, $\delta_0=0.25$, initial mesh $4\times4$, initial adaptation to $\bu_0$ (addition (vii)); uniform
+runs with $\dt=0.005$.
+
+\paragraph{$\nu=10^{-4}$ (layers 0.01 wide).}
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lrrll}
+\toprule
+method & unknowns at $T$ & max cells & $\|\bu-\bu_h\|_0$ & SUPG norm\\
+\midrule
+uniform SUPG, level 3 / 4 / 5 / 6 & 2\,468 / 9\,540 / 37\,508 / 148\,740 & -- & 4.49e-2 / 1.15e-2 / 1.95e-3 / 2.84e-4 & 8.53e-2 / 3.27e-2 / 1.08e-2 / 3.27e-3\\
+uniform Galerkin, level 4 / 5 / 6 & 9\,540 / 37\,508 / 148\,740 & -- & 1.14e-2 / 1.85e-3 / 2.44e-4 & --\\
+\code{exact} + D\"orfler ($\theta=0.3$, 5\,\% coarsening), target 0.03 & 20\,285 & 10\,901 & 1.26e-2 & 2.95e-2\\
+\code{exact} + D\"orfler, target 0.015 & 33\,566 & 11\,073 & 5.75e-3 & 1.42e-2\\
+\code{exact} + D\"orfler, no coarsening, target 0.03 & 14\,857 & 3\,199 & 1.01e-2 & 2.87e-2\\
+\code{h1}/\code{supg} D\"orfler, target 0.2 / 0.1 / 0.05 & 14\,290 / 27\,336 / 62\,061 & 7\,797 / 9\,272 / 16\,353 & 8.80e-3 / 3.24e-3 / 1.55e-3 & 3.58e-2 / 1.66e-2 / 9.79e-3\\
+FGJN14 thresholds, \code{supg}, TOL$_1$ 0.02 / 0.01 & 5\,456 / 9\,731 & 1\,181 / 2\,179 & 1.47e-2 / 5.62e-3 & 5.33e-2 / 3.09e-2\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+No adaptive variant beats uniform refinement in the SUPG norm, also not with the exact indicator; the only gain is in
+$L^2$ for the FGJN14 thresholds (5.6e-3 against 1.15e-2 at $\approx9\,600$ unknowns). With FGJN14 thresholds even the exact
+indicator was worse than uniform (TOL$_1=2\cdot10^{-3}$: $L^2$ error $3.7\cdot10^{-2}$ on 19\,823 unknowns at $T=0.25$):
+with an absolute local tolerance many coarse interior cells each stay just below TOL$_1$ and add up to a large global
+error. The 5\,\% coarsening in every step made the D\"orfler mesh oscillate (coarsening pushes the error above the target,
+D\"orfler refines 30\,\% back); without coarsening the same accuracy needs at most 3\,199 instead of 10\,901 cells (31\,s
+instead of 365\,s), but is still slightly worse than uniform ($\approx2.3\cdot10^{-2}$ at 14\,857 unknowns, interpolated).
+Plausible reason (not verified): at $\nu=10^{-4}$ the layers are not thin compared with the scales of the $O(1)$ interior
+shear, which needs a fairly fine mesh everywhere; uniform level 5 ($h\approx0.022$) already resolves the layers reasonably.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/layer_nu1e-4_error_vs_dofs.png}
+\caption{Boundary layers, $\nu=10^{-4}$, $T=0.25$: error against unknowns (filled: at $T$; hollow: estimated maximum
+during the run).}
+\end{figure}
+
+\paragraph{$\nu=10^{-6}$ (layers 0.001 wide).} D\"orfler marking without coarsening, maximal refinement level 22.
+\begin{center}\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lrll}
+\toprule
+method & unknowns at $T$ (= max) & $\|\bu-\bu_h\|_0$ & SUPG norm\\
+\midrule
+uniform SUPG, level 4 / 5 / 6 & 9\,540 / 37\,508 / 148\,740 & 8.00e-2 / 4.74e-2 / 2.19e-2 & 6.40e-2 / 3.77e-2 / 2.19e-2\\
+uniform Galerkin, level 6 & 148\,740 & 2.21e-2 & --\\
+\textbf{\code{h1}/\code{supg} D\"orfler, target 0.1} & \textbf{62\,381} & \textbf{8.08e-3} & \textbf{2.00e-2}\\
+\textbf{\code{h1}/\code{supg} D\"orfler, target 0.05} & \textbf{114\,167} & \textbf{7.68e-3} & \textbf{1.62e-2}\\
+\code{exact} + D\"orfler, target 0.02 & 239\,866 & 4.16e-2 & 1.99e-2\\
+\code{exact} + D\"orfler, target 0.01 & 319\,909 & 5.36e-3 & 7.99e-3\\
+FGJN14 thresholds, \code{supg}, TOL$_1$ 0.01 & 12\,338 & 4.20e-2 & 4.36e-2\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}\end{center}
+Here adaptivity pays off: \code{h1} ranking + D\"orfler with the \code{supg} global estimate has, compared with uniform
+level 6, a 2.7 times smaller $L^2$ error and a slightly smaller SUPG-norm error with 42\,\% of the unknowns (target 0.1),
+and a 2.9 times smaller $L^2$ error and a 1.35 times smaller SUPG-norm error with 77\,\% of the unknowns (target 0.05).
+Uniform refinement converges slowly ($L^2$ rates 0.76 and 1.1 between levels 4--5--6; level 6 has $h\approx11\delta$). The
+exact SUPG-norm indicator needs a much tighter target before it resolves the layer (at 0.02 its $L^2$ error is still
+$4.2\cdot10^{-2}$; at 0.01 it is the most accurate run, with 320\,000 unknowns): at $\nu=10^{-6}$ the SUPG norm is dominated
+by $10^{-3}|e|_1$ and is weak for an unresolved layer. The FGJN14 thresholds with \code{supg} are cheap but inaccurate.
+Not completed (killed by the out-of-memory killer at $\approx14$\,GB): uniform level 7 and the exact $L^2$ indicator with
+targets 0.02 and 0.01, whose meshes grew without bound (a plausible reason, not verified: $L^2$ error created in the
+layers is convected into the interior, and refining where it sits does not remove it). The levels 4 and 5 of the uniform
+run were transcribed from its log because the run was killed before writing its result file.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/layer_nu1e-6_error_vs_dofs.png}
+\caption{Boundary layers, $\nu=10^{-6}$, $T=0.25$: error against unknowns.}
+\end{figure}
+
 \section{Observations}
 
 \begin{enumerate}
@@ -497,19 +605,26 @@ local velocity (all $\log_{10}$).}
   $h_K/|\bu_h|$; $\delta_K/h_K$ reaches 65 near walls and vortex centres. In~\cite{FGJN14} the convection $\boldsymbol b$ is
   given and typically bounded away from zero; in Navier--Stokes it is not. At $\nu=10^{-4}$, level 4, cells with
   $\|\bu_h\|_{\infty,K}<0.05$ carry 44\,\% of $\eta^2$ and 5.5\,\% of $e^2$. The estimator is robust globally but ranks the
-  cells poorly; this explains its poor adaptive meshes (non-monotone errors, up to 30 Newton iterations).
+  cells poorly; this explains its poor adaptive meshes (up to 22 Newton iterations; before addition (v) also errors that
+  were not monotone in TOL$_1$ and up to 30 Newton iterations).
 \item \textbf{Marking and global estimate must be separated.} The \code{h1} indicator ranks the cells best but its magnitude
   is not robust in $\nu$; with D\"orfler marking on \code{h1} and the \code{supg} global estimate the adaptive runs at
   $\nu=10^{-4}$ behave as intended (monotone errors, no rejections, at most 7 Newton iterations). The control run with
   D\"orfler marking on \code{supg} collapsed: its 5\,\% ``smallest'' cells are the fast-flow cells, where the error is; the
   mesh was coarsened there (157 $\to$ 45 cells), the error grew from 0.15 to 0.28, the estimate exploded to $\sim10^5$ and the
   step size to $\sim10^{-10}$ near $t=0.414$.
-\item \textbf{On the smooth solution adaptivity does not pay off.} At $\nu=10^{-4}$ the exact indicator reaches the uniform
-  level-4 SUPG-norm error at similar cost and beats it at 2.6 times the unknowns; \code{h1}/D\"orfler needs about 1.4 times
-  the unknowns of the exact indicator. This is expected for a smooth solution and says nothing about problems with layers.
-\item \textbf{Probable time-error floor.} The adaptive $L^2$ errors at $\nu=10^{-4}$ level off near $9\cdot10^{-3}$ while the
-  unknowns double (Fig.~\ref{fig:adaptive}); the adaptive runs take 47--68 steps (${\rm tol}_t=10^{-3}$) against 100 fixed
-  steps for the uniform runs. A rerun with ${\rm tol}_t=10^{-4}$ would settle this; not done.
+\item \textbf{Adaptivity pays off only for thin layers.} On the smooth solution (D.7) no variant is more efficient than
+  uniform refinement (the exact indicator at $\nu=10^{-4}$: $5.1\cdot10^{-2}$ on 9\,541 unknowns against $4.75\cdot10^{-2}$ on
+  9\,540 for uniform level 4); for layers of width 0.01 ($\nu=10^{-4}$) neither, also not with the exact indicator. For
+  layers of width 0.001 ($\nu=10^{-6}$) \code{h1} ranking + D\"orfler with the \code{supg} global estimate beats uniform
+  level 6 in both norms with fewer unknowns (Sect.~\ref{sec:layers}).
+\item \textbf{Absolute local thresholds do not control the global error} when the error is unevenly distributed: many cells
+  just below TOL$_1$ add up (boundary layers, $\nu=10^{-4}$: the exact indicator with FGJN14 thresholds had a 3.2 times larger
+  $L^2$ error than uniform level 4 with about twice its unknowns). D\"orfler marking with a global target does; its coarsening must be
+  gentle or switched off, otherwise the mesh oscillates.
+\item \textbf{Time-error floor not settled.} On D.7 the time-adaptivity study shows no influence of ${\rm tol}_t$ between
+  $10^{-2}$ and $10^{-4}$ on level 3 (spatial error dominant); whether the slowly decreasing adaptive $L^2$ errors at
+  $\nu=10^{-4}$ (Fig.~\ref{fig:adaptive}) are limited by ${\rm tol}_t=10^{-3}$ was not tested.
 \item \textbf{SUPG vs Galerkin.} For this resolved smooth solution SUPG is less accurate than Galerkin in $L^2$
   on uniform meshes, and its SUPG-norm rates are below theory; open (pre-asymptotic behaviour or the choice of $\delta_K$).
 \end{enumerate}
@@ -534,15 +649,19 @@ systems than Picard, and the IMEX results of Example~7.62. Deviations: the eleme
 unstabilised scheme at $\nu=10^{-4}$ in Example~7.44.
 
 Part~II gives a verified SUPG--Taylor--Hood discretisation with the trapezoidal rule and an adaptive algorithm with
-exchangeable indicators and marking strategies. The adaptive loop works with the exact indicator and with \code{h1}
-ranking + \code{supg} global estimate; the direct extension of the FGJN14 estimator localises poorly because its cell weight
-is unbounded where the velocity vanishes. Next steps: rerun with ${\rm tol}_t=10^{-4}$; a test problem with layers, where
-adaptivity can pay off; an analysis of a cell weight that stays bounded for $\bu_h\to0$.
+exchangeable indicators and marking strategies, extending~\cite{FGJN14} to Navier--Stokes; seven additions to the
+algorithm were needed, each prompted by an observed failure. The direct extension of the FGJN14 estimator is robust
+globally but localises poorly, because its cell weight is unbounded where the velocity vanishes, and absolute local
+thresholds do not control the global error. With \code{h1} ranking, the \code{supg} estimator as global measure and
+D\"orfler marking without coarsening, adaptivity beats uniform refinement for boundary layers of width 0.001
+($\nu=10^{-6}$): 2.7--2.9 times smaller $L^2$ error with 42--77\,\% of the unknowns of uniform level 6. It does not pay off
+on the smooth solution or for layers of width 0.01. Open: a cell weight that stays bounded for $\bu_h\to0$ (needs
+analysis), the moving-layer case (time adaptivity), finer uniform references and other end times for $\nu=10^{-6}$.
 
 \paragraph{Reproduction.} {\sloppy Code and scripts: galerkit, branch \code{time-navier-stokes},
 \code{examples/\allowbreak navier\_stokes/\allowbreak 2d/\allowbreak theta\_john2016} (\code{d5\_steady.py}, \code{d7\_convergence.py}, \code{picard\_newton.py},
 \code{d9\_cylinder.py}, \code{d8\_imex.py}) and \code{examples/\allowbreak navier\_stokes/\allowbreak 2d/\allowbreak adaptive\_supg\_ns} (\code{adaptive\_d7.py},
-\code{diagnose\_indicator.py}, \code{plot\_summary.py}); each script has \code{--smoke} and documents its options.\par}
+\code{diagnose\_indicator.py}, \code{plot\_summary.py}, \code{plot\_layer.py}); each script has \code{--smoke} and documents its options.\par}
 
 \begin{thebibliography}{9}
 \bibitem{John2016} V.~John, \emph{Finite Element Methods for Incompressible Flow Problems}, Springer Series in
