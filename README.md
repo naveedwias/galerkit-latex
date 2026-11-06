@@ -11,6 +11,7 @@ LaTeX sources (and compiled PDFs) of the reports written alongside the galerkit 
 | `convection_diffusion/kn23_reproduction/` | `kn23_reproduction.pdf` | SMUAS method of Knobloch, Numer. Algorithms 94 (2023): implementation check, algorithm, reproduction of the results |
 | `convection_diffusion/anisotropic_afc/` | `anisotropic_afc.pdf` | algebraic stabilizations on anisotropic (Shishkin) meshes: accuracy, nonlinear solvers, DMP mesh conditions (galerkit branch `feature/anisotropic-afc`) |
 | `navier_stokes/theta_supg_th/` | `theta_supg_th.pdf` | Taylor-Hood P2/P1 theta-schemes after John (2016), Ch. 7 (Examples 7.44, 7.57 in 2D, 7.58, 7.62; D.5, D.7, D.8, D.9) and adaptive SUPG for Navier-Stokes extending de Frutos, Garcia-Archilla, John & Novo (2014): implementation, observations, results (galerkit branch `time-navier-stokes`) |
+| `navier_stokes/adaptive_spg_th/` | `adaptive_spg_th.pdf` | A posteriori error estimation for SUPG-Taylor-Hood discretisations of the time-dependent Navier-Stokes equations: AAJ27 Examples 5.1/5.2 in time (convergence, effectivity, contributions) and an implementation of the adaptive SUPG/PSPG/grad-div method of the draft v6 (review, audit of the earlier code, Examples 1-3, backward Euler start) (galerkit branch `time-navier-stokes`) |
 | `navier_stokes/3d/numerical_example_3d.tex` | (not built: needs the `siunitx` package) | 3D Navier-Stokes numerical example |
 
 Each reproduction study is self-contained in its own folder (`*.tex`, `tables/`, `figures/`, PDF).
