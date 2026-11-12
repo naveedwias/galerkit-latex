@@ -263,6 +263,29 @@ $\|\bu-\bU\|_0$ ($1.07\cdot10^{-4}$ vs $1.005\cdot10^{-4}$), since $\bU^0$ is no
 stands: a backward Euler first step needs only $\bu_0$ and never solves the start system for $(\bud^0,P^0)$, so it should
 also avoid the singular case with an outflow boundary (\emph{plausible}, not tested here).
 
+\paragraph{Comparison with the averaging of GGS08 and ParMooN-2026.} ParMooN's TR-AB2 integrator (\code{TrapezoidalAB2})
+has no backward Euler step; its damping device is the averaging of GGS08, $(\bU,\bud,P)\leftarrow$ the mean of the last two
+time levels, placed at $t-\dt/2$, either periodically every $n^*$ steps or once after the start and after every mesh change
+(``on demand'', default $n^*=10$). Same test as above (script \code{start\_comparison.py}):
+\begin{center}\small
+\adjustbox{max width=\textwidth}{\begin{tabular}{lcccccccc}\toprule
+start & first steps & $\|p-P\|_0$ & $\|\bud-\partial_t\bu\|_0$ & $\|\bu-\bU\|_0$ & spg error & effectivity & linear solves & steps\\\midrule
+backward Euler first step & clean & 2.64e-3 & 2.0e-3 & 1.005e-4 & 1.597e-2 & 18.7--20.1 & 600 & 300\\
+averaging once after step 1 & clean after step 1 & 2.66e-3 & 4.0e-3 & 1.004e-4 & 1.597e-2 & 18.75--20.1 & 603 & 301\\
+averaging once after 10 steps & polluted 10 steps & 2.66e-3 & 4.0e-3 & 1.004e-4 & 1.597e-2 & 18.75--20.1 & 603 & 301\\
+periodic averaging, $n^*=10$ & polluted 10 steps & 2.67e-3 & 2.7e-4 & 0.996e-4$^*$ & 1.598e-2 & 18.8--20.1 & 633 & 316\\\bottomrule
+\end{tabular}}
+\end{center}
+(Values at the end, $t\approx0.3$; $^*$ at $t=0.285$; ``polluted'': pressure error $1.46$ and effectivity $3$--$5$ before
+the first averaging.) All remedies agree to three or four digits in the spg error, the velocity and pressure errors and
+the effectivity (\emph{checked}). One averaging gives the same state whether it is applied after one or after ten steps,
+but the steps before it carry the full start error, which would steer the first refinements of an adaptive run.
+Periodic averaging gives the most accurate time derivative, at $5.5\%$ more linear solves (every averaging loses half a
+step) and with an $O(\dt^2)$ perturbation per averaging; every averaging shifts the time grid by $\dt/2$. The backward
+Euler first step is as accurate as every averaging variant, clean from the first step, keeps the time grid and is the
+cheapest. Note that ParMooN-2026 averages only with variable steps (\code{!fixed\_step} in \code{TrapezoidalAB2.C}), so its
+fixed-step runs of Example~1 have no start remedy unless the consistent projection is selected.
+
 \section{Example 2: boundary layers, adaptive}\label{sec:ex2}
 AAJ27 Sect.~4.2 solution times $(1+\frac12\sin\pi t)$ (pressure also), $T=1$, $TOL_T=10^{-5}$, threshold marking
 ($TOL_2=TOL_1/20$).
@@ -329,7 +352,8 @@ near the refined cylinder, then the mesh jumped from $3\,900$ to $30\,000$ cells
 \item The implementation of the draft (P2/P1) is verified (15 tests). Two bugs of the earlier implementation were fixed; the
 pressure coupling and the load assembly were correct.
 \item Example 1: the estimator is robust in $h$ and $\nu$ on uniform meshes (effectivity $\approx20$), once the TR scheme is
-started with a backward Euler step instead of $\bud^0$ from (eq:semi). (H2) and, at $t=2$, (H5) fail by moderate factors; the
+started with a backward Euler step instead of $\bud^0$ from (eq:semi); the start remedies of ParMooN-2026 (constraint start,
+consistent projection, averaging) give the same accuracy, none is better, and backward Euler is the simplest and cheapest. (H2) and, at $t=2$, (H5) fail by moderate factors; the
 bound holds with a large margin. For $\nu\le10^{-3}$ the auxiliary steady problem is often not solvable and (eq:heur) is not
 supported, as anticipated by the non-robustness of (H6).
 \item Example 2: the algorithm as written fails at $\nu=10^{-3}$; with (a)+(b), $\dt\ge0.1\min\delta_K$ and a sufficiently
