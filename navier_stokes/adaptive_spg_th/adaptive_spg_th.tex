@@ -229,21 +229,39 @@ so (eq:heur) is not supported. This is consistent with the non-robustness of (H6
 
 \section{The start of the TR scheme}\label{sec:start}
 On level 6 the pressure error starts at $1.1$--$1.4$ and decays slowly ($\nu=10^{-2}$: still $0.54$ at $t=2$), and the spg error is
-dominated by its $\delta_K\|(\bU\cdot\nabla)E+\nabla E_p\|$ part. Three starts were compared (level 6, $\nu=10^{-2}$, $\dt=10^{-3}$, $t\le0.3$):
+dominated by its $\delta_K\|(\bU\cdot\nabla)E+\nabla E_p\|$ part. Five starts were compared (level 6, $\nu=10^{-2}$, $\dt=10^{-3}$, $t\le0.3$):
 \begin{center}\small
 \adjustbox{max width=\textwidth}{\begin{tabular}{lcccc}\toprule
 start & $\|p-P\|_0$, $t=0.01/0.3$ & $\|\bud-\partial_t\bu\|_0$, $t=0.3$ & spg error, $t=0.3$ & effectivity\\\midrule
 $\bud^0$ from (eq:semi) (draft) & 1.45 / 1.24 & 7.2 & 5.93e-2 & 3.1--5.0\\
 one backward Euler step ($\bU^0$ only) & 3.1e-3 / 2.6e-3 & 2.0e-3 & 1.60e-2 & 18.7--20.1\\
-$\bud^0$ = interpolant of $\partial_t\bu(0)$ & 3.1e-3 / 2.7e-3 & 4.0e-3 & 1.60e-2 & 18.7--20.1\\\bottomrule
+$\bud^0$ = interpolant of $\partial_t\bu(0)$ & 3.1e-3 / 2.7e-3 & 4.0e-3 & 1.60e-2 & 18.7--20.1\\
+ParMooN (c): momentum rows + $B\bud^0=0$ & 3.1e-3 / 2.7e-3 & 8.8e-3 & 1.60e-2 & 18.7--20.6\\
+ParMooN (d): consistent projection of $\bU^0$ & 3.0e-3 / 2.6e-3 & 3.4e-4 & 1.60e-2 & 18.7--20.1\\\bottomrule
 \end{tabular}}
 \end{center}
-The velocity error is the same in all three ($1.0\cdot10^{-4}$ at $t=0.3$). The level-6 drop of the effectivity is caused
+The velocity error is the same for the first three ($1.0\cdot10^{-4}$ at $t=0.3$). The level-6 drop of the effectivity is caused
 entirely by $\bud^0$ from (eq:semi), whose $O(1)$ error the trapezoidal rule damps only slowly on fine meshes (\emph{checked}).
 Plausible mechanism (not proved): the mode is stiff with $z\sim\dt/\delta_K$ ($\approx16$ on level 6, $4$ on level 5 at
 $\nu=10^{-2}$), and $|R(z)|\to1$. \textbf{Recommendation for the draft:} start with one backward Euler step, which needs only
 $\bu_0$ (or take $\bud^0=\partial_t\bu_0$ if known). A rerun of Example 1 with this start was stopped after levels 2--5, whose
 values at $t=2$ coincide with those of Table~\ref{tab:ex1} to all printed digits.
+
+\paragraph{Comparison with the start remedies of ParMooN-2026.} The ParMooN-2026 implementation of the draft (branch
+\code{adaptive-refactor}, class \code{TimeNavierStokesSPG}) has two remedies, reimplemented here
+(\code{example1.py --start constraint}, \code{--start consproj}):
+(c) $(\bud^0,P^0)$ from the momentum rows of (eq:semi) and the differentiated constraint $B\bud^0=0$ with the Galerkin
+divergence matrix; ParMooN uses it only without PSPG or with an outflow boundary (where the PSPG start system is singular),
+i.e.\ not for the enclosed Example~1, which it starts as the draft does;
+(d) a consistent projection of $\bU^0$, $A^{\boldsymbol b}(\bU^0,P^0)=L^{\boldsymbol b}(0)-M^{\boldsymbol b}I_h\partial_t\bu(0)$ with
+$\boldsymbol b=I_h\bu_0$, followed by $\bud^0$ from (eq:semi); it needs the exact $\partial_t\bu(0)$.
+Neither improves on the backward Euler start (\emph{checked}): the spg error ($1.597\cdot10^{-2}$ at $t=0.3$), the pressure
+error and the effectivity agree to three or four digits. (c) needs only $\bu_0$, like backward Euler, but its time
+derivative is about 20 times less accurate after the first step ($0.26$ vs $1.3\cdot10^{-2}$) and still 4 times at $t=0.3$;
+(d) gives the most accurate time derivative ($3.4\cdot10^{-4}$) but needs the exact $\partial_t\bu$ and has a $7\%$ larger
+$\|\bu-\bU\|_0$ ($1.07\cdot10^{-4}$ vs $1.005\cdot10^{-4}$), since $\bU^0$ is no longer the $L^2$ projection. The recommendation
+stands: a backward Euler first step needs only $\bu_0$ and never solves the start system for $(\bud^0,P^0)$, so it should
+also avoid the singular case with an outflow boundary (\emph{plausible}, not tested here).
 
 \section{Example 2: boundary layers, adaptive}\label{sec:ex2}
 AAJ27 Sect.~4.2 solution times $(1+\frac12\sin\pi t)$ (pressure also), $T=1$, $TOL_T=10^{-5}$, threshold marking
